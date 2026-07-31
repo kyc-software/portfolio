@@ -1,6 +1,8 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
   <title>Anthony Abramo</title>
-  <rect width="64" height="64" rx="14" fill="#050607"/>
-  <path fill="#f1eee8" fill-rule="evenodd" d="M4 50 14 14h8l10 36h-8l-2-8h-8l-2 8H4Zm12-15h4l-2-10-2 10Z"/>
-  <path fill="#f1eee8" fill-rule="evenodd" d="M32 50 42 14h8l10 36h-8l-2-8h-8l-2 8h-8Zm12-15h4l-2-10-2 10Z"/>
+  <rect width="64" height="64" rx="7" fill="#050607"/>
+  <g transform="translate(9.6 9.6) scale(.7)">
+    <path fill="#f1eee8" fill-rule="evenodd" d="M4 50 14 14h8l10 36h-8l-2-8h-8l-2 8H4Zm12-15h4l-2-10-2 10Z"/>
+    <path fill="#f1eee8" fill-rule="evenodd" d="M32 50 42 14h8l10 36h-8l-2-8h-8l-2 8h-8Zm12-15h4l-2-10-2 10Z"/>
+  </g>
 </svg>
