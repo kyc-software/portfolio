@@ -629,7 +629,7 @@ a[href]:active {
 .project-grid {
   display: grid;
   grid-template-columns: repeat(12, minmax(0, 1fr));
-  grid-auto-rows: 1fr;
+  grid-auto-rows: auto;
   gap: clamp(1rem, 1.6vw, 1.6rem);
   align-items: stretch;
   max-width: 96rem;

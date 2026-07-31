@@ -44,7 +44,13 @@ function ProjectCard({
       <button
         type="button"
         className="project-card-trigger"
-        onClick={(event) => onOpen(project, event.currentTarget)}
+        onClick={(event) => {
+          if (project.embeddable === false) {
+            window.open(project.liveUrl, "_blank", "noopener,noreferrer");
+            return;
+          }
+          onOpen(project, event.currentTarget);
+        }}
         aria-label={`Open ${project.title} website`}
       >
         <div className="project-media">

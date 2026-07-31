@@ -12,6 +12,7 @@ export type Project = {
     height: number;
   };
   liveUrl: string;
+  embeddable?: boolean;
 };
 
 export type SocialLink = {
@@ -119,5 +120,35 @@ export const projects: Project[] = [
       height: 900,
     },
     liveUrl: "https://bisonflow.com/en",
+  },
+  {
+    slug: "pixlr",
+    title: "Pixlr",
+    summary:
+      "Streaming multimodal creation across image, video, audio, design, logo, and slide workflows.",
+    role: "Full-stack engineering · Engineering lead",
+    year: 2025,
+    tags: [
+      "React",
+      "TypeScript",
+      "Next.js",
+      "Hono",
+      "Python",
+      "FastAPI",
+      "Prisma",
+      "MySQL",
+      "Valkey",
+      "SSE",
+      "AI",
+      "Object storage",
+    ],
+    cover: {
+      src: "/projects/pixlr.webp",
+      alt: "Pixlr AI photo editor and image generator interface",
+      width: 1600,
+      height: 900,
+    },
+    liveUrl: "https://pixlr.com/",
+    embeddable: false,
   },
 ];
