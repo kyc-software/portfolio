@@ -1,0 +1,24 @@
+{
+  "name": "Anthony Abramo Portfolio",
+  "short_name": "Anthony Abramo",
+  "icons": [
+    {
+      "src": "/favicon-32x32.png",
+      "sizes": "32x32",
+      "type": "image/png"
+    },
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    },
+    {
+      "src": "/apple-touch-icon.png",
+      "sizes": "180x180",
+      "type": "image/png"
+    }
+  ],
+  "theme_color": "#050607",
+  "background_color": "#050607",
+  "display": "standalone"
+}
