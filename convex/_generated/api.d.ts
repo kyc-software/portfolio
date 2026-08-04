@@ -12,6 +12,7 @@ import type * as assistant from "../assistant.js";
 import type * as embeddings from "../embeddings.js";
 import type * as faqCatalog from "../faqCatalog.js";
 import type * as http from "../http.js";
+import type * as rateLimits from "../rateLimits.js";
 import type * as routing from "../routing.js";
 
 import type {
@@ -25,6 +26,7 @@ declare const fullApi: ApiFromModules<{
   embeddings: typeof embeddings;
   faqCatalog: typeof faqCatalog;
   http: typeof http;
+  rateLimits: typeof rateLimits;
   routing: typeof routing;
 }>;
 
@@ -54,4 +56,6 @@ export declare const internal: FilterApi<
   FunctionReference<any, "internal">
 >;
 
-export declare const components: {};
+export declare const components: {
+  rateLimiter: import("@convex-dev/rate-limiter/_generated/component.js").ComponentApi<"rateLimiter">;
+};

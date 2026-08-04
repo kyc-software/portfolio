@@ -86,6 +86,8 @@ routing verification.
 
 - Secure, HttpOnly, host-only visitor cookie persists anonymous identity.
 - Visitor gets ten uncached answers during seven-day window starting at first miss.
+- Every turn first passes distributed Convex visitor and global burst limits. This
+  includes exact prepared answers, so cached audio cannot be spammed through normal UI/API.
 - FAQ lookup happens before quota charge: exact normalized alias first, then
   semantic intent. Cached answers cost no live-answer quota.
 - Semantic routing uses `text-embedding-3-small`, one stored vector per FAQ,
@@ -105,6 +107,8 @@ routing verification.
   spends live-answer quota. Expanded results are capped below half chat height and
   scroll independently, so future 50+ question catalogs cannot hide conversation
   history.
+- Prepared-question metadata is fetched once per page visit through a retryable,
+  deduplicated promise; browser private caching remains a secondary layer.
 - Stored MP3 plays locally while cached assistant text enters same Realtime history,
   preserving follow-up context.
 - Missing MP3 falls back to exact Realtime speech, so feature remains usable during
@@ -124,6 +128,8 @@ routing verification.
 ## Main parts
 
 - `convex/schema.ts`: visitors, FAQs, candidates.
+- `convex/convex.config.ts` and `convex/rateLimits.ts`: Convex rate-limiter component
+  plus visitor/global policies for turns, sessions, browsing, and candidate writes.
 - `convex/faqCatalog.ts`: versioned production questions, answers, aliases, and signals.
 - `convex/assistant.ts`: provisioning, readiness, atomic quota, candidate upsert, Speech and stored
   intent-embedding generation.
@@ -145,8 +151,12 @@ routing verification.
 - Convex HTTP actions require bearer bridge secret.
 - Cookie is opaque UUID with `Secure`, `HttpOnly`, `SameSite=Lax` in production.
 - Convex mutation makes quota check/increment atomic across tabs and deployments.
-- Existing per-process session burst limit remains four starts per ten minutes per
-  IP-derived identifier.
+- Convex rate-limiter component adds distributed visitor and global limits before
+  expensive or repeatable work. Current policy: turns 12/minute with burst 2 per
+  visitor; starts 4/10 minutes; prepared-list reads 6/minute with burst 2; candidate
+  writes 10/hour with burst 3. Global ceilings cover cookie rotation/distributed abuse.
+- Deployment warning and hard-disable limits cap daily/monthly function calls,
+  database I/O, egress, and action compute.
 - User can erase browser data to receive new anonymous identity. Preventing this
   completely requires account identity or stricter network-level controls.
 - Determined users can bypass normal per-turn UI routing through direct WebRTC data
@@ -176,4 +186,6 @@ exact and semantic hits preserve quota. Live generation requires Convex
 - [Convex HTTP actions](https://docs.convex.dev/functions/http-actions)
 - [Convex file storage](https://docs.convex.dev/file-storage/store-files)
 - [Convex scheduled functions](https://docs.convex.dev/scheduling/scheduled-functions)
+- [Convex rate limiting](https://docs.convex.dev/agents/rate-limiting)
+- [Convex usage limits](https://docs.convex.dev/production/usage-limits)
 - [Base UI Collapsible](https://base-ui.com/react/components/collapsible)

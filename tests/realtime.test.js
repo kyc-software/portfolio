@@ -14,6 +14,7 @@ import {
   WHO_ARE_YOU_ANSWER,
 } from "../src/lib/assistant-copy.ts";
 import {
+  assistantRateLimitMessage,
   INITIAL_GREETING,
   isLikelyEcho,
   parseRealtimeEvent,
@@ -25,6 +26,17 @@ test("uses fixed opening greeting", () => {
   assert.equal(
     INITIAL_GREETING,
     "Hello, I'm Anthony's AI assistant, what can I do for you ?",
+  );
+});
+
+test("formats bounded assistant rate-limit feedback", () => {
+  assert.equal(
+    assistantRateLimitMessage(1_001),
+    "You're asking too quickly. Try again in 2 seconds.",
+  );
+  assert.equal(
+    assistantRateLimitMessage(120_000),
+    "You're asking too quickly. Try again in 60 seconds.",
   );
 });
 

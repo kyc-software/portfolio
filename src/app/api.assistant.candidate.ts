@@ -4,9 +4,8 @@ export const Route = createFileRoute("/api/assistant/candidate")({
   server: {
     handlers: {
       POST: async ({ request }) => {
-        const { hasValidRequestOrigin, recordAssistantCandidate } = await import(
-          "@/server/assistant-backend.server"
-        );
+        const { applyVisitorCookie, hasValidRequestOrigin, recordAssistantCandidate } =
+          await import("@/server/assistant-backend.server");
         if (!hasValidRequestOrigin(request)) return new Response(null, { status: 403 });
 
         const body = (await request.json().catch(() => null)) as {
@@ -24,8 +23,14 @@ export const Route = createFileRoute("/api/assistant/candidate")({
           return new Response(null, { status: 400 });
 
         try {
-          await recordAssistantCandidate(body.question.trim(), body.answer.trim());
-          return new Response(null, { status: 204 });
+          const cookie = await recordAssistantCandidate(
+            request,
+            body.question.trim(),
+            body.answer.trim(),
+          );
+          const headers = new Headers();
+          applyVisitorCookie(headers, cookie);
+          return new Response(null, { status: 204, headers });
         } catch (error) {
           console.error(
             "Assistant candidate logging failed",

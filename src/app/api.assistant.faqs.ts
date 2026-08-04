@@ -4,9 +4,8 @@ export const Route = createFileRoute("/api/assistant/faqs")({
   server: {
     handlers: {
       GET: async ({ request }) => {
-        const { hasValidRequestOrigin, listFreeQuestions } = await import(
-          "@/server/assistant-backend.server"
-        );
+        const { applyVisitorCookie, hasValidRequestOrigin, listFreeQuestions } =
+          await import("@/server/assistant-backend.server");
         if (!hasValidRequestOrigin(request))
           return Response.json(
             { message: "Request origin is not allowed." },
@@ -14,11 +13,10 @@ export const Route = createFileRoute("/api/assistant/faqs")({
           );
 
         try {
-          const questions = await listFreeQuestions();
-          return Response.json(
-            { questions },
-            { headers: { "Cache-Control": "private, max-age=300" } },
-          );
+          const { questions, cookie } = await listFreeQuestions(request);
+          const headers = new Headers({ "Cache-Control": "private, max-age=300" });
+          applyVisitorCookie(headers, cookie);
+          return Response.json({ questions }, { headers });
         } catch (error) {
           console.error(
             "Assistant FAQ listing failed",

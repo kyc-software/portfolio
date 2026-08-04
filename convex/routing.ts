@@ -31,6 +31,7 @@ type RouteResult =
       remaining: number;
     }
   | { kind: "realtime"; remaining: number }
+  | { kind: "rate_limited"; retryAfter: number }
   | { kind: "limited"; remaining: 0 };
 
 type QuotaResult = { allowed: boolean; remaining: number };
@@ -41,6 +42,15 @@ export const routeTurn = internalAction({
     question: v.string(),
   },
   handler: async (ctx, { visitorToken, question }): Promise<RouteResult> => {
+    const turnLimit = await ctx.runMutation(internal.assistant.limitTurn, {
+      visitorToken,
+    });
+    if (!turnLimit.ok)
+      return {
+        kind: "rate_limited" as const,
+        retryAfter: turnLimit.retryAfter,
+      };
+
     const normalized = normalizeAssistantQuestion(question);
     const faqs = await ctx.runQuery(internal.assistant.faqsForMatching, {});
     const exact = faqs.find((faq) => faq.aliases.includes(normalized));

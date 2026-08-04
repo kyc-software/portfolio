@@ -7,6 +7,11 @@ export type TranscriptEntry = {
 
 export { INITIAL_GREETING } from "@/lib/assistant-copy";
 
+export function assistantRateLimitMessage(retryAfter: number) {
+  const seconds = Math.max(1, Math.min(60, Math.ceil(retryAfter / 1000)));
+  return `You're asking too quickly. Try again in ${seconds} ${seconds === 1 ? "second" : "seconds"}.`;
+}
+
 export type RealtimeUiEvent =
   | { type: "speech-started" }
   | { type: "speech-stopped" }

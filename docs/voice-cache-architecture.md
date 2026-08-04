@@ -3,7 +3,7 @@
 ## Decision
 
 Keep browser-to-OpenAI WebRTC for low-latency speech. Put durable identity,
-weekly quota, FAQ routing, candidate logging, and generated audio in Convex.
+weekly quota, distributed abuse limits, FAQ routing, candidate logging, and generated audio in Convex.
 Portfolio server remains only browser-facing trust boundary.
 
 Production catalog contains one session greeting and 50 prepared questions covering
@@ -23,6 +23,7 @@ flowchart LR
   B["Visitor browser"] -->|"same-origin requests + HttpOnly visitor cookie"| P["Portfolio server"]
   P -->|"shared-secret HTTP bridge"| C["Convex"]
   C --> D["Visitor quota + FAQ + candidate tables"]
+  C --> R["Convex rate-limiter component"]
   C --> F["Convex file storage"]
   C -->|"one-time FAQ embedding + eligible question embedding"| E["OpenAI Embeddings API"]
   C -->|"one-time speech generation"| T["OpenAI Speech API"]
@@ -33,6 +34,9 @@ flowchart LR
 - Portfolio server owns anonymous visitor cookie and never exposes Convex bridge
   secret or OpenAI API key.
 - Convex HTTP actions accept only matching bearer secret.
+- Convex checks per-visitor and global limits before session creation, every turn,
+  prepared-question listing, or candidate write. Prepared answers avoid AI quota,
+  but never bypass anti-spam limits.
 - Convex action checks exact aliases, then semantic intent, before atomically
   spending quota.
 - Narrow intent signals prevent unrelated questions from reaching semantically
@@ -58,7 +62,9 @@ sequenceDiagram
   Visitor->>Browser: Start conversation
   Browser->>Portfolio: POST WebRTC offer
   Portfolio->>Portfolio: Read or issue HttpOnly visitor cookie
-  Portfolio->>Convex: Initialize visitor and load greeting
+  Portfolio->>Convex: Initialize visitor
+  Convex->>Convex: Enforce visitor + global session limits
+  Convex->>Convex: Load quota and greeting
   Convex-->>Portfolio: Remaining quota + greeting URL when ready
   Portfolio->>Realtime: Create WebRTC session
   Realtime-->>Browser: WebRTC answer
@@ -81,6 +87,10 @@ sequenceDiagram
   Browser->>Browser: Finalize question + show thinking state
   Browser->>Portfolio: Route transcript
   Portfolio->>Convex: Route question
+  Convex->>Convex: Enforce visitor + global turn limits
+  alt Burst limit reached
+    Convex-->>Browser: Retry delay; no FAQ read or AI call
+  end
   Convex->>Convex: Check normalized exact aliases
   alt Exact alias
     Convex-->>Browser: Cached answer + audio + exact match
@@ -118,6 +128,7 @@ sequenceDiagram
   Browser->>Browser: Ready session auto-opens picker beside greeting
   Browser->>Portfolio: GET prepared questions
   Portfolio->>Convex: Authorized FAQ-list request
+  Convex->>Convex: Enforce visitor + global browse limits
   Convex->>Convex: Keep non-greeting FAQs with ready stored audio
   Convex-->>Portfolio: Canonical question labels
   Portfolio-->>Browser: Private short-lived response
@@ -128,8 +139,9 @@ sequenceDiagram
 
 Question labels are curated catalog data provisioned explicitly during deployment. Ready
 session auto-opens and fetches picker once; first user turn collapses it, with manual
-reopening always available. List is session-cached in component and HTTP response
-may be privately cached for five minutes. UI accepts arbitrary catalog size;
+reopening always available. One page-lifetime promise caches and deduplicates the list;
+failed requests remain retryable. HTTP response may also be privately cached for five
+minutes. UI accepts arbitrary catalog size;
 expanded panel is height-capped and independently scrollable so 50+ entries
 preserve visible transcript space.
 
@@ -146,10 +158,25 @@ preserve visible transcript space.
   local ten-answer fallback so UI and OpenAI fallbacks remain testable.
 - Existing short-window IP/session limiter remains defense in depth.
 
+Weekly quota controls paid answers. Separate distributed limits control request volume,
+including prepared paths:
+
+- Turns: visitor burst 2, refilling 12/minute; global burst 60, refilling 300/minute.
+- Session starts: 4/10 minutes per visitor; global burst 10, refilling 30/minute.
+- Prepared-list reads: visitor burst 2, refilling 6/minute; global burst 30,
+  refilling 120/minute. Page cache normally makes this one request per visit.
+- Candidate writes: visitor burst 3, refilling 10/hour; global burst 30,
+  refilling 300/hour.
+
+Global counters are sharded where traffic warrants it. Production deployment also has
+daily and monthly warning plus hard-disable thresholds for function calls, database I/O,
+egress, and action compute. These caps are final spend containment, not user-facing flow
+control.
+
 Visitor identity is opaque random value in production `Secure`, `HttpOnly`,
 `SameSite=Lax`, host-only cookie. User can delete browser data and receive a new
-identity; anonymous browser identity cannot prevent that. Existing IP burst
-limit reduces trivial repeated resets.
+identity; anonymous browser identity cannot prevent that. Visitor/global Convex limits
+and existing IP burst limiting reduce trivial repeated resets.
 
 ## Cache lifecycle
 
@@ -194,6 +221,10 @@ Direct WebRTC data channel still technically lets a determined visitor send
 UI abuse and keeps secrets server-side, but is not cryptographically strict
 per-turn enforcement. Strict enforcement requires OpenAI sideband control with
 browser response control removed, or a server-owned Realtime connection.
+
+Returned Convex storage URLs can also be replayed until they expire. Global request limits
+protect URL issuance and deployment egress hard limits cap total damage, but strict
+per-play authorization would require proxying audio through a controlled edge/server path.
 
 ## Implemented path
 

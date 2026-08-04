@@ -12,7 +12,16 @@ export type AssistantTurn =
       remaining: number;
     }
   | { kind: "realtime"; remaining: number }
+  | { kind: "rate_limited"; retryAfter: number }
   | { kind: "limited"; remaining: 0 };
+
+export type AssistantInitialization =
+  | { allowed: false; retryAfter: number }
+  | {
+      allowed: true;
+      remaining: number;
+      greeting: { answer: string; audioUrl: string | null } | null;
+    };
 
 export type FreeQuestion = { key: string; question: string };
 
@@ -64,10 +73,9 @@ async function callConvex<T>(path: string, body: unknown): Promise<T> {
 export async function initializeAssistant(request: Request) {
   const visitor = visitorCookie(request);
   try {
-    const result = await callConvex<{
-      remaining: number;
-      greeting: { answer: string; audioUrl: string | null } | null;
-    }>("/assistant/initialize", { visitorToken: visitor.token });
+    const result = await callConvex<AssistantInitialization>("/assistant/initialize", {
+      visitorToken: visitor.token,
+    });
     return { ...result, cookie: visitor.header };
   } catch (error) {
     if (!import.meta.env.DEV) throw error;
@@ -75,7 +83,12 @@ export async function initializeAssistant(request: Request) {
       "Convex assistant backend unavailable in development",
       error instanceof Error ? error.message : "Error",
     );
-    return { remaining: 10, greeting: null, cookie: visitor.header };
+    return {
+      allowed: true as const,
+      remaining: 10,
+      greeting: null,
+      cookie: visitor.header,
+    };
   }
 }
 
@@ -100,9 +113,18 @@ export async function routeAssistantTurn(request: Request, question: string) {
   }
 }
 
-export async function recordAssistantCandidate(question: string, answer: string) {
+export async function recordAssistantCandidate(
+  request: Request,
+  question: string,
+  answer: string,
+) {
+  const visitor = visitorCookie(request);
   try {
-    await callConvex("/assistant/candidate", { question, answer });
+    await callConvex("/assistant/candidate", {
+      visitorToken: visitor.token,
+      question,
+      answer,
+    });
   } catch (error) {
     if (!import.meta.env.DEV) throw error;
     console.warn(
@@ -110,19 +132,23 @@ export async function recordAssistantCandidate(question: string, answer: string)
       error instanceof Error ? error.message : "Error",
     );
   }
+  return visitor.header;
 }
 
-export async function listFreeQuestions() {
+export async function listFreeQuestions(request: Request) {
+  const visitor = visitorCookie(request);
   try {
-    const result = await callConvex<{ questions: FreeQuestion[] }>("/assistant/faqs", {});
-    return result.questions;
+    const result = await callConvex<{ questions: FreeQuestion[] }>("/assistant/faqs", {
+      visitorToken: visitor.token,
+    });
+    return { questions: result.questions, cookie: visitor.header };
   } catch (error) {
     if (!import.meta.env.DEV) throw error;
     console.warn(
       "Convex FAQ listing unavailable in development",
       error instanceof Error ? error.message : "Error",
     );
-    return [];
+    return { questions: [], cookie: visitor.header };
   }
 }
 

@@ -6,6 +6,7 @@ import { type FormEvent, useCallback, useEffect, useRef, useState } from "react"
 
 import { isVoiceFiller } from "@/lib/assistant-copy";
 import {
+  assistantRateLimitMessage,
   INITIAL_GREETING,
   isLikelyEcho,
   parseRealtimeEvent,
@@ -31,12 +32,27 @@ type TurnDecision =
       remaining: number;
     }
   | { kind: "realtime"; remaining: number }
+  | { kind: "rate_limited"; retryAfter: number }
   | { kind: "limited"; remaining: 0 };
 
 const IDLE_TIMEOUT_MS = 90_000;
 const SESSION_TIMEOUT_MS = 5 * 60_000;
 const QUOTA_MESSAGE =
   "This visitor has used this week's AI answer allowance. Cached questions remain available.";
+
+let preparedQuestionsRequest: Promise<FreeQuestion[]> | null = null;
+
+function fetchPreparedQuestions() {
+  preparedQuestionsRequest ??= fetch("/api/assistant/faqs").then(async (response) => {
+    if (!response.ok) throw new Error("FAQ listing failed");
+    const result = (await response.json()) as { questions?: FreeQuestion[] };
+    return result.questions ?? [];
+  });
+  return preparedQuestionsRequest.catch((error) => {
+    preparedQuestionsRequest = null;
+    throw error;
+  });
+}
 
 function statusLabel(phase: Phase, textOnly: boolean) {
   if (phase === "connecting") return "Connecting";
@@ -73,10 +89,7 @@ function FreeQuestionPicker({
     setLoading(true);
     setLoadError(false);
     try {
-      const response = await fetch("/api/assistant/faqs");
-      if (!response.ok) throw new Error("FAQ listing failed");
-      const result = (await response.json()) as { questions?: FreeQuestion[] };
-      setQuestions(result.questions ?? []);
+      setQuestions(await fetchPreparedQuestions());
     } catch {
       setLoadError(true);
     } finally {
@@ -189,6 +202,7 @@ export function VoiceAssistant() {
   const turnPendingRef = useRef(false);
   const pendingQuestionRef = useRef("");
   const pendingAnswerRef = useRef("");
+  const turnBlockedUntilRef = useRef(0);
   const greetingAudioUrlRef = useRef<string | null>(null);
   const fetchAbortRef = useRef<AbortController | null>(null);
   const idleTimerRef = useRef<number | null>(null);
@@ -232,6 +246,7 @@ export function VoiceAssistant() {
     turnPendingRef.current = false;
     pendingQuestionRef.current = "";
     pendingAnswerRef.current = "";
+    turnBlockedUntilRef.current = 0;
     greetingAudioUrlRef.current = null;
     setUserDraft("");
     setAssistantDraft("");
@@ -344,6 +359,7 @@ export function VoiceAssistant() {
   const routeUserTurn = useCallback(
     async (text: string) => {
       if (turnPendingRef.current) return;
+      if (Date.now() < turnBlockedUntilRef.current) return;
       turnPendingRef.current = true;
       const generation = startGenerationRef.current;
       pendingQuestionRef.current = "";
@@ -363,6 +379,17 @@ export function VoiceAssistant() {
         if (!response.ok) throw new Error("Turn routing failed");
 
         const decision = (await response.json()) as TurnDecision;
+
+        if (decision.kind === "rate_limited") {
+          turnBlockedUntilRef.current = Date.now() + decision.retryAfter;
+          appendTranscript({
+            role: "assistant",
+            text: assistantRateLimitMessage(decision.retryAfter),
+          });
+          setPhase("listening");
+          return;
+        }
+
         setQuestionsRemaining(decision.remaining);
 
         if (decision.kind === "limited") {

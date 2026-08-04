@@ -165,6 +165,19 @@ export async function createRealtimeSession(request: Request) {
     );
   }
 
+  if (!assistant.allowed) {
+    const headers = new Headers({
+      "Retry-After": String(Math.max(1, Math.ceil(assistant.retryAfter / 1000))),
+    });
+    applyVisitorCookie(headers, assistant.cookie);
+    return jsonError(
+      "RATE_LIMITED",
+      "Too many voice sessions. Try again shortly.",
+      429,
+      headers,
+    );
+  }
+
   const form = new FormData();
   form.set("sdp", sdp);
   const requestedModel = requestUrl.searchParams.get("model");

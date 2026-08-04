@@ -10,6 +10,12 @@ import {
 } from "./_generated/server";
 import { createEmbedding, EMBEDDING_VERSION } from "./embeddings";
 import { FAQ_CATALOG_VERSION, PREPARED_QUESTION_COUNT, SEEDED_FAQS } from "./faqCatalog";
+import {
+  limitAssistantBrowse,
+  limitAssistantCandidate,
+  limitAssistantSession,
+  limitAssistantTurn,
+} from "./rateLimits";
 
 const QUESTION_LIMIT = 10;
 const QUOTA_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
@@ -155,6 +161,13 @@ export const provisionCatalog = internalMutation({
 export const initialize = internalMutation({
   args: { visitorToken: v.string() },
   handler: async (ctx, { visitorToken }) => {
+    const sessionLimit = await limitAssistantSession(ctx, visitorToken);
+    if (!sessionLimit.ok)
+      return {
+        allowed: false as const,
+        retryAfter: sessionLimit.retryAfter,
+      };
+
     const now = Date.now();
     let visitor = await ctx.db
       .query("visitors")
@@ -187,6 +200,7 @@ export const initialize = internalMutation({
       .unique();
 
     return {
+      allowed: true as const,
       remaining: remaining(visitor?.used ?? 0),
       greeting: greeting
         ? {
@@ -196,6 +210,16 @@ export const initialize = internalMutation({
         : null,
     };
   },
+});
+
+export const limitTurn = internalMutation({
+  args: { visitorToken: v.string() },
+  handler: (ctx, { visitorToken }) => limitAssistantTurn(ctx, visitorToken),
+});
+
+export const limitBrowse = internalMutation({
+  args: { visitorToken: v.string() },
+  handler: (ctx, { visitorToken }) => limitAssistantBrowse(ctx, visitorToken),
 });
 
 export const catalogStatus = internalQuery({
@@ -314,10 +338,14 @@ export const updateQuota = internalMutation({
 
 export const recordCandidate = internalMutation({
   args: {
+    visitorToken: v.string(),
     question: v.string(),
     answer: v.string(),
   },
-  handler: async (ctx, { question, answer }) => {
+  handler: async (ctx, { visitorToken, question, answer }) => {
+    const candidateLimit = await limitAssistantCandidate(ctx, visitorToken);
+    if (!candidateLimit.ok) return;
+
     const normalizedQuestion = normalizeAssistantQuestion(question);
     if (!normalizedQuestion) return;
 
