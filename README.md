@@ -12,13 +12,17 @@ bun install
 bun run dev
 ```
 
-AI assistant also needs a server-only OpenAI key:
+AI assistant uses OpenAI plus Convex:
 
 ```dotenv
 OPENAI_API_KEY=sk-proj-your-key
+CONVEX_SITE_URL=https://fabulous-warbler-191.convex.site
+CONVEX_BRIDGE_SECRET=shared-random-secret
 ```
 
-Put it in `.env.local`. See [AI assistant architecture and operations](docs/voice-guide.md).
+Put local values in `.env.local`. Convex needs matching `BRIDGE_SECRET` and its
+own `OPENAI_API_KEY`. See [AI assistant operations](docs/voice-guide.md) and
+[cache architecture](docs/voice-cache-architecture.md).
 
 ## Verify and build
 

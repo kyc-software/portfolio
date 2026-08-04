@@ -1,17 +1,19 @@
 export type TranscriptEntry = {
   role: "user" | "assistant";
   text: string;
+  source?: "faq";
+  matchedBy?: "semantic";
 };
 
-export const INITIAL_GREETING =
-  "Hello, I'm Anthony's AI assistant, what can I do for you ?";
+export { INITIAL_GREETING } from "@/lib/assistant-copy";
 
 export type RealtimeUiEvent =
   | { type: "speech-started" }
   | { type: "speech-stopped" }
   | { type: "assistant-delta"; text: string }
   | { type: "assistant-done"; text: string }
-  | { type: "user-done"; text: string }
+  | { type: "user-delta"; text: string; itemId?: string }
+  | { type: "user-done"; text: string; itemId?: string }
   | { type: "response-started" }
   | { type: "response-done"; status?: string }
   | { type: "audio-started" }
@@ -78,9 +80,26 @@ export function parseRealtimeEvent(raw: string): RealtimeUiEvent[] {
       ? [{ type: "assistant-done", text: event.transcript }]
       : [];
 
+  if (type === "conversation.item.input_audio_transcription.delta")
+    return typeof event.delta === "string"
+      ? [
+          {
+            type: "user-delta",
+            text: event.delta,
+            ...(typeof event.item_id === "string" ? { itemId: event.item_id } : {}),
+          },
+        ]
+      : [];
+
   if (type === "conversation.item.input_audio_transcription.completed")
     return typeof event.transcript === "string"
-      ? [{ type: "user-done", text: event.transcript }]
+      ? [
+          {
+            type: "user-done",
+            text: event.transcript,
+            ...(typeof event.item_id === "string" ? { itemId: event.item_id } : {}),
+          },
+        ]
       : [];
 
   if (type === "error") {

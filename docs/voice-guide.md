@@ -2,106 +2,135 @@
 
 ## Outcome
 
-Landing-page voice assistant answers questions about Anthony from a curated Markdown profile. Browser uses OpenAI Realtime API over WebRTC. Portfolio server performs only protected session creation; API key never enters client code.
+Landing-page assistant answers from Anthony's curated Markdown profile. OpenAI
+Realtime handles live speech over WebRTC. Convex owns anonymous weekly quota,
+exact and semantic FAQ routing, reusable audio, and cache-candidate analytics. Browser never
+receives OpenAI keys or Convex bridge secret.
 
-## Setup
+Detailed diagrams and trust boundaries: [voice-cache-architecture.md](voice-cache-architecture.md).
 
-Create `.env.local` at repository root:
+## Production setup
+
+Production Convex deployment:
+
+- Deployment: `fabulous-warbler-191`
+- API URL: `https://fabulous-warbler-191.convex.cloud`
+- HTTP bridge: `https://fabulous-warbler-191.convex.site`
+- Dashboard: `https://dashboard.convex.dev/t/anthony-abramo/portfolio-2026/fabulous-warbler-191`
+
+Generate one random bridge secret, then set these values.
+
+Portfolio hosting environment:
 
 ```dotenv
 OPENAI_API_KEY=sk-proj-your-key
+CONVEX_SITE_URL=https://fabulous-warbler-191.convex.site
+CONVEX_BRIDGE_SECRET=<random-secret>
 ```
 
-Restart development server after adding key. Do not prefix this variable with `VITE_`: Vite-prefixed values become browser-readable.
+Convex production environment:
 
-## Architecture
-
-```mermaid
-flowchart LR
-  V["Visitor browser"] -->|"POST WebRTC offer"| S["Nitro session route"]
-  S -->|"API key + offer + session config"| O["OpenAI Realtime API"]
-  O -->|"WebRTC answer"| S
-  S -->|"WebRTC answer"| V
-  V <-->|"Audio + event data over WebRTC"| O
-  P["Curated profile Markdown"] --> S
+```dotenv
+OPENAI_API_KEY=sk-proj-your-key
+BRIDGE_SECRET=<same-random-secret>
 ```
 
-Server route exists because long-lived OpenAI API keys must not ship inside static JavaScript. Convex would add another service without removing this requirement, so current Nitro runtime handles session creation.
+Do not prefix secrets with `VITE_`; Vite-prefixed values can become public.
+`OPENAI_API_KEY` is required in both runtimes because portfolio server creates
+Realtime sessions while Convex creates reusable Speech API audio and FAQ/query
+embeddings.
 
-## Request sequence
+After setting Convex variables, start one conversation. Idempotent initialization
+seeds seven FAQ records and schedules seven MP3 files. Failed generation retries on
+next initialization. Check `faqs` table for `audioStatus: "ready"` and populated
+`audioStorageId`.
 
-```mermaid
-sequenceDiagram
-  actor Visitor
-  participant Browser
-  participant Portfolio as Portfolio server
-  participant OpenAI
-  Visitor->>Browser: Select microphone
-  Browser->>Browser: Request microphone and create WebRTC offer
-  Browser->>Portfolio: POST /api/realtime/session (SDP)
-  Portfolio->>Portfolio: Check origin, payload, rate limit, key
-  Portfolio->>OpenAI: POST /v1/realtime/calls
-  OpenAI-->>Portfolio: SDP answer
-  Portfolio-->>Browser: SDP answer
-  Browser-->>OpenAI: Realtime audio and events
-  OpenAI-->>Browser: Speech, captions, lifecycle events
-  Visitor->>Browser: Close or say goodbye
-  Browser->>OpenAI: Cancel response and close peer
+Deploy later Convex changes with:
+
+```bash
+bunx convex deploy
 ```
+
+## Local development
+
+`bunx convex dev` creates/updates `.env.local` with development deployment URLs.
+Add matching local bridge values:
+
+```dotenv
+OPENAI_API_KEY=sk-proj-your-key
+CONVEX_BRIDGE_SECRET=<development-secret>
+```
+
+Set Convex development variables:
+
+```bash
+bunx convex env set BRIDGE_SECRET <development-secret>
+bunx convex env set OPENAI_API_KEY <your-key>
+bun run dev
+```
+
+Development keeps model picker. Production replaces it with remaining-question
+counter and Base UI explanation popover. Development cached answers show Free;
+semantic cache hits additionally show Semantic for routing verification.
+
+## Runtime behavior
+
+- Secure, HttpOnly, host-only visitor cookie persists anonymous identity.
+- Visitor gets ten uncached answers during seven-day window starting at first miss.
+- FAQ lookup happens before quota charge: exact normalized alias first, then
+  semantic intent. Cached answers cost no live-answer quota.
+- Semantic routing uses `text-embedding-3-small`, one stored vector per FAQ,
+  direct cosine comparison, a portfolio-subject gate, intent signals, confidence
+  threshold, and runner-up margin. This avoids vector-database overhead for six
+  searchable intents and rejects unrelated or ambiguous questions.
+- `Tony`, `he`, `him`, and `his` are treated as Anthony. Common pronoun questions
+  use exact aliases; freer phrasings continue through semantic matching.
+- Seven cached topics cover greeting, identity, profile overview, Next.js experience,
+  latest projects, location, and working style.
+- Stored MP3 plays locally while cached assistant text enters same Realtime history,
+  preserving follow-up context.
+- Missing MP3 falls back to exact Realtime speech, so feature remains usable during
+  setup or Speech API failure.
+- Cache misses reserve one credit atomically, use Realtime, then upsert question and
+  answer into `candidates` for later FAQ review. Candidates never auto-promote.
+- Common microphone fillers are ignored without spending quota.
+- Input transcription deltas render while the visitor speaks. Speech end shows
+  the thinking indicator through FAQ routing or Realtime generation.
+- Full transcript remains scrollable until the conversation ends; no messages
+  are discarded during an active session.
+- Production fails closed when Convex is unavailable or misconfigured.
+- Ending conversation closes WebRTC peer, data channel, microphone tracks, pending
+  request, and both audio players. New click starts fresh context.
 
 ## Main parts
 
-- `src/components/voice-assistant.tsx`: WebRTC lifecycle, microphone/text modes, captions, timeout, stop/retry UI.
-- `src/app/api.realtime.session.ts`: thin TanStack Start server route.
-- `src/server/realtime-session.server.ts`: prompt, Realtime session configuration, validation, OpenAI handshake.
-- `src/content/anthony-profile.md`: public, curated knowledge source. Update this file when Anthony's experience changes.
-- `src/lib/realtime.ts`: event parsing and playback-echo detection.
-- `src/lib/realtime-rate-limit.ts`: lightweight abuse guard.
-- `tests/realtime.test.js`: deterministic fallback/event/session tests.
+- `convex/schema.ts`: visitors, FAQs, candidates.
+- `convex/assistant.ts`: seed, atomic quota, candidate upsert, Speech and stored
+  intent-embedding generation.
+- `convex/embeddings.ts`: official Embeddings API call and cosine similarity.
+- `convex/routing.ts`: exact/semantic/Realtime decision pipeline.
+- `convex/http.ts`: shared-secret HTTP bridge.
+- `src/server/assistant-backend.server.ts`: cookie and Convex client boundary.
+- `src/app/api.assistant.turn.ts`: browser cache/quota route.
+- `src/app/api.assistant.candidate.ts`: completed miss logging.
+- `src/server/realtime-session.server.ts`: prompt, validation, OpenAI handshake.
+- `src/components/voice-assistant.tsx`: WebRTC, cache playback, context injection,
+  quota UI, fallback behavior.
+- `src/content/anthony-profile.md`: public knowledge source.
 
-`src/content/anthony-profile.md` is separate from the original CV. It contains
-repo-verified Bragi Notes, Tingshuo, Loany, Biotech, and portfolio work while
-omitting private phone and company contact data.
+## Security and limits
 
-The complete profile is embedded in each new session's instructions. No vector
-database, retrieval layer, Convex storage, or cross-session memory is involved.
-Keep this public knowledge source accurate and concise to control prompt cost.
-
-## Conversation behavior
-
-- Every session opens with: “Hello, I'm Anthony's AI assistant, what can I do for you ?”
-- Unrelated requests receive one fixed sentence: “I'm only meant to answer questions about Anthony's experience and portfolio.” Related but unverified questions still direct visitors to Anthony.
-- Low-eagerness semantic VAD identifies complete visitor turns. Client never cancels on raw sound detection: it waits for completed transcription, rejects likely playback echo, then interrupts only for verified visitor speech.
-- Transcript smoothly follows new and streaming messages.
-- `gpt-realtime-2.1-mini` keeps voice cost below larger Realtime models.
-- Local development shows a two-model picker: mini (`Great`, `$`) and full
-  `gpt-realtime-2.1` (`Best`, `$$$`). Production ignores model query parameters
-  and always uses mini.
-- Replies cap at 800 output tokens, while the prompt targets one or two sentences
-  and fewer than 45 spoken words. Overview answers name at most three items,
-  briefly describe them, then invite a focused follow-up. The higher hard cap
-  remains because Realtime output budgets include audio and smaller caps can cut
-  speech mid-sentence.
-- Browser keeps assistant in speaking state until `output_audio_buffer.stopped`; `response.done` only means generation finished and can arrive before WebRTC playback drains.
-- Session ends after five minutes; inactivity ends after 90 seconds.
-- Saying goodbye invokes `end_conversation`; close button always works.
-- Ending closes WebRTC peer, data channel, microphone tracks, pending handshake,
-  and audio playback. Every new microphone click starts with empty context.
-- Denied/unavailable microphone switches to typed input while keeping spoken output.
-- Missing API key, invalid SDP, rate limit, network failure, and OpenAI failure return safe messages without leaking upstream details.
-
-## Security and cost controls
-
-- API key exists only in `OPENAI_API_KEY` on server.
-- Same-origin request check and restrictive microphone permissions policy.
-- Production session creation limited to four attempts per ten minutes per
-  process/IP-derived identifier. Development bypasses this limit for model testing.
-- SDP payload limited to 24 KB.
-- OpenAI request timeout: 15 seconds.
-- Session prompt treats profile as sole factual source and rejects instruction overrides.
-- OpenAI safety identifier uses a one-way hash; raw IP is not sent.
-
-In-memory limiting is intentionally deployment-local. Add durable rate limiting only if public abuse proves it necessary. For stronger budget protection, also set project-level OpenAI usage limits.
+- OpenAI keys remain server-only.
+- Convex HTTP actions require bearer bridge secret.
+- Cookie is opaque UUID with `Secure`, `HttpOnly`, `SameSite=Lax` in production.
+- Convex mutation makes quota check/increment atomic across tabs and deployments.
+- Existing per-process session burst limit remains four starts per ten minutes per
+  IP-derived identifier.
+- User can erase browser data to receive new anonymous identity. Preventing this
+  completely requires account identity or stricter network-level controls.
+- Determined users can bypass normal per-turn UI routing through direct WebRTC data
+  channel calls. Strict enforcement requires server-owned Realtime sideband control.
+- Set OpenAI project usage limits as final budget ceiling.
 
 ## Verification
 
@@ -109,13 +138,19 @@ In-memory limiting is intentionally deployment-local. Add durable rate limiting 
 bun run verify
 ```
 
-Without a key, automated checks cover parsing, rate limiting, type safety,
-formatting, build, and missing-key UI/API behavior. Live speech quality and
-OpenAI session-schema acceptance require configured key.
+Automated tests cover FAQ normalization, semantic guards, cosine comparison, filler
+filtering, Realtime events, session limiting, type safety, formatting, and production
+build. Convex bridge validation additionally confirms exact and semantic hits keep
+quota while near misses reserve one credit. Live audio and embedding generation
+require Convex `OPENAI_API_KEY`.
 
 ## Official references
 
 - [Realtime API with WebRTC](https://developers.openai.com/api/docs/guides/realtime-webrtc)
 - [Realtime conversations](https://developers.openai.com/api/docs/guides/realtime-conversations)
-- [Voice activity detection](https://developers.openai.com/api/docs/guides/realtime-vad)
-- [`gpt-realtime-2.1-mini`](https://developers.openai.com/api/docs/models/gpt-realtime-2.1-mini)
+- [Text-to-speech](https://developers.openai.com/api/docs/guides/text-to-speech)
+- [Embeddings](https://developers.openai.com/api/docs/guides/embeddings)
+- [Semantic search](https://developers.openai.com/api/docs/guides/retrieval#semantic-search)
+- [Convex HTTP actions](https://docs.convex.dev/functions/http-actions)
+- [Convex file storage](https://docs.convex.dev/file-storage/store-files)
+- [Convex scheduled functions](https://docs.convex.dev/scheduling/scheduled-functions)

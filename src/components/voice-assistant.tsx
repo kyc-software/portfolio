@@ -1,7 +1,9 @@
+import { Popover } from "@base-ui/react/popover";
 import { Select } from "@base-ui/react/select";
-import { Check, ChevronDown, Mic, Send } from "lucide-react";
+import { Check, ChevronDown, Info, Mic, Send } from "lucide-react";
 import { type FormEvent, useCallback, useEffect, useRef, useState } from "react";
 
+import { isVoiceFiller } from "@/lib/assistant-copy";
 import {
   INITIAL_GREETING,
   isLikelyEcho,
@@ -16,9 +18,23 @@ import {
 } from "@/lib/realtime-models";
 
 type Phase = "idle" | "connecting" | "listening" | "thinking" | "speaking" | "error";
+type TranscriptItem = TranscriptEntry & { id: number };
+
+type TurnDecision =
+  | {
+      kind: "cached";
+      match: "exact" | "semantic";
+      answer: string;
+      audioUrl: string | null;
+      remaining: number;
+    }
+  | { kind: "realtime"; remaining: number }
+  | { kind: "limited"; remaining: 0 };
 
 const IDLE_TIMEOUT_MS = 90_000;
 const SESSION_TIMEOUT_MS = 5 * 60_000;
+const QUOTA_MESSAGE =
+  "This visitor has used this week's AI answer allowance. Cached questions remain available.";
 
 function statusLabel(phase: Phase, textOnly: boolean) {
   if (phase === "connecting") return "Connecting";
@@ -30,24 +46,35 @@ function statusLabel(phase: Phase, textOnly: boolean) {
 
 export function VoiceAssistant() {
   const [phase, setPhase] = useState<Phase>("idle");
-  const [transcript, setTranscript] = useState<TranscriptEntry[]>([]);
+  const [transcript, setTranscript] = useState<TranscriptItem[]>([]);
+  const [userDraft, setUserDraft] = useState("");
   const [assistantDraft, setAssistantDraft] = useState("");
   const [question, setQuestion] = useState("");
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
   const [textOnly, setTextOnly] = useState(false);
   const [model, setModel] = useState<RealtimeModel>(DEFAULT_REALTIME_MODEL);
+  const [questionsRemaining, setQuestionsRemaining] = useState<number | null>(null);
 
   const peerRef = useRef<RTCPeerConnection | null>(null);
   const channelRef = useRef<RTCDataChannel | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const cachedAudioRef = useRef<HTMLAudioElement | null>(null);
   const transcriptRef = useRef<HTMLDivElement | null>(null);
+  const transcriptIdRef = useRef(0);
+  const userDraftRef = useRef("");
+  const userDraftItemRef = useRef("");
   const assistantDraftRef = useRef("");
   const lastAssistantTextRef = useRef("");
   const responseActiveRef = useRef(false);
   const audioPlayingRef = useRef(false);
+  const greetingPlayingRef = useRef(false);
   const speechStartedDuringAssistantRef = useRef(false);
+  const turnPendingRef = useRef(false);
+  const pendingQuestionRef = useRef("");
+  const pendingAnswerRef = useRef("");
+  const greetingAudioUrlRef = useRef<string | null>(null);
   const fetchAbortRef = useRef<AbortController | null>(null);
   const idleTimerRef = useRef<number | null>(null);
   const sessionTimerRef = useRef<number | null>(null);
@@ -70,15 +97,28 @@ export function VoiceAssistant() {
       audioRef.current.pause();
       audioRef.current.srcObject = null;
     }
+    if (cachedAudioRef.current) {
+      cachedAudioRef.current.pause();
+      cachedAudioRef.current.removeAttribute("src");
+      cachedAudioRef.current.load();
+    }
     fetchAbortRef.current = null;
     channelRef.current = null;
     peerRef.current = null;
     streamRef.current = null;
+    userDraftRef.current = "";
+    userDraftItemRef.current = "";
     assistantDraftRef.current = "";
     lastAssistantTextRef.current = "";
     responseActiveRef.current = false;
     audioPlayingRef.current = false;
+    greetingPlayingRef.current = false;
     speechStartedDuringAssistantRef.current = false;
+    turnPendingRef.current = false;
+    pendingQuestionRef.current = "";
+    pendingAnswerRef.current = "";
+    greetingAudioUrlRef.current = null;
+    setUserDraft("");
     setAssistantDraft("");
   }, [clearTimers]);
 
@@ -95,6 +135,7 @@ export function VoiceAssistant() {
     setError("");
     setNotice("");
     setTextOnly(false);
+    setQuestionsRemaining(null);
   }, [releaseConnection]);
 
   const resetIdleTimer = useCallback(() => {
@@ -103,7 +144,8 @@ export function VoiceAssistant() {
   }, [stopConversation]);
 
   const appendTranscript = useCallback((entry: TranscriptEntry) => {
-    setTranscript((current) => [...current, entry].slice(-6));
+    transcriptIdRef.current += 1;
+    setTranscript((current) => [...current, { ...entry, id: transcriptIdRef.current }]);
   }, []);
 
   const send = useCallback((event: unknown) => {
@@ -112,21 +154,166 @@ export function VoiceAssistant() {
     return true;
   }, []);
 
+  const finishGreeting = useCallback(() => {
+    if (!greetingPlayingRef.current) return;
+    greetingPlayingRef.current = false;
+    for (const track of streamRef.current?.getAudioTracks() ?? []) track.enabled = true;
+  }, []);
+
   const interruptAssistant = useCallback(() => {
     if (responseActiveRef.current) send({ type: "response.cancel" });
     if (audioPlayingRef.current) send({ type: "output_audio_buffer.clear" });
+    if (cachedAudioRef.current && !cachedAudioRef.current.paused) {
+      cachedAudioRef.current.pause();
+      cachedAudioRef.current.currentTime = 0;
+    }
     responseActiveRef.current = false;
     audioPlayingRef.current = false;
-  }, [send]);
+    finishGreeting();
+  }, [finishGreeting, send]);
+
+  const requestExactSpeech = useCallback(
+    (answer: string) => {
+      const accepted = send({
+        type: "response.create",
+        response: {
+          instructions: `Say exactly: "${answer}" Say nothing else. Do not change any word or punctuation.`,
+          output_modalities: ["audio"],
+        },
+      });
+      if (!accepted) return false;
+      responseActiveRef.current = true;
+      setPhase("thinking");
+      return true;
+    },
+    [send],
+  );
+
+  const deliverCachedAnswer = useCallback(
+    async (answer: string, audioUrl: string | null, match: "exact" | "semantic") => {
+      const audio = cachedAudioRef.current;
+      if (!audio || !audioUrl) {
+        requestExactSpeech(answer);
+        return;
+      }
+
+      try {
+        audio.src = audioUrl;
+        audio.currentTime = 0;
+        audioPlayingRef.current = true;
+        setPhase("speaking");
+        await audio.play();
+        lastAssistantTextRef.current = answer;
+        send({
+          type: "conversation.item.create",
+          item: {
+            type: "message",
+            role: "assistant",
+            content: [{ type: "output_text", text: answer }],
+          },
+        });
+        appendTranscript({
+          role: "assistant",
+          text: answer,
+          source: "faq",
+          ...(match === "semantic" ? { matchedBy: "semantic" as const } : {}),
+        });
+      } catch {
+        audioPlayingRef.current = false;
+        requestExactSpeech(answer);
+      }
+    },
+    [appendTranscript, requestExactSpeech, send],
+  );
+
+  const routeUserTurn = useCallback(
+    async (text: string) => {
+      if (turnPendingRef.current) return;
+      turnPendingRef.current = true;
+      const generation = startGenerationRef.current;
+      pendingQuestionRef.current = "";
+      pendingAnswerRef.current = "";
+      interruptAssistant();
+      appendTranscript({ role: "user", text });
+      setPhase("thinking");
+      resetIdleTimer();
+
+      try {
+        const response = await fetch("/api/assistant/turn", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ question: text }),
+        });
+        if (generation !== startGenerationRef.current) return;
+        if (!response.ok) throw new Error("Turn routing failed");
+
+        const decision = (await response.json()) as TurnDecision;
+        setQuestionsRemaining(decision.remaining);
+
+        if (decision.kind === "limited") {
+          lastAssistantTextRef.current = QUOTA_MESSAGE;
+          appendTranscript({ role: "assistant", text: QUOTA_MESSAGE });
+          send({
+            type: "conversation.item.create",
+            item: {
+              type: "message",
+              role: "assistant",
+              content: [{ type: "output_text", text: QUOTA_MESSAGE }],
+            },
+          });
+          setPhase("listening");
+          return;
+        }
+
+        if (decision.kind === "cached") {
+          await deliverCachedAnswer(decision.answer, decision.audioUrl, decision.match);
+          return;
+        }
+
+        pendingQuestionRef.current = text;
+        if (send({ type: "response.create" })) {
+          responseActiveRef.current = true;
+          setPhase("thinking");
+        }
+      } catch {
+        setNotice("AI answer routing is temporarily unavailable. Try again shortly.");
+        setPhase("listening");
+      } finally {
+        turnPendingRef.current = false;
+      }
+    },
+    [appendTranscript, deliverCachedAnswer, interruptAssistant, resetIdleTimer, send],
+  );
+
+  const recordCandidate = useCallback((questionText: string, answer: string) => {
+    void fetch("/api/assistant/candidate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ question: questionText, answer }),
+    }).catch(() => undefined);
+  }, []);
 
   const handleServerEvent = useCallback(
     (raw: string) => {
       resetIdleTimer();
       for (const event of parseRealtimeEvent(raw)) {
         if (event.type === "speech-started") {
+          userDraftRef.current = "";
+          userDraftItemRef.current = "";
+          setUserDraft("");
           const assistantBusy = responseActiveRef.current || audioPlayingRef.current;
           speechStartedDuringAssistantRef.current = assistantBusy;
           if (!assistantBusy) setPhase("listening");
+        }
+        if (event.type === "speech-stopped" && !speechStartedDuringAssistantRef.current)
+          setPhase("thinking");
+        if (event.type === "user-delta") {
+          if (event.itemId && event.itemId !== userDraftItemRef.current) {
+            userDraftItemRef.current = event.itemId;
+            userDraftRef.current = "";
+          }
+          userDraftRef.current += event.text;
+          setUserDraft(userDraftRef.current);
         }
         if (event.type === "response-started") {
           responseActiveRef.current = true;
@@ -141,6 +328,7 @@ export function VoiceAssistant() {
           const text = event.text.trim() || assistantDraftRef.current.trim();
           if (text) {
             lastAssistantTextRef.current = text;
+            if (pendingQuestionRef.current) pendingAnswerRef.current = text;
             appendTranscript({ role: "assistant", text });
           }
           assistantDraftRef.current = "";
@@ -152,23 +340,55 @@ export function VoiceAssistant() {
         }
         if (event.type === "audio-stopped") {
           audioPlayingRef.current = false;
+          finishGreeting();
           if (!responseActiveRef.current) setPhase("listening");
         }
-        if (event.type === "user-done" && event.text.trim()) {
+        if (event.type === "user-done") {
           const text = event.text.trim();
+          if (!event.itemId || event.itemId === userDraftItemRef.current) {
+            userDraftRef.current = "";
+            userDraftItemRef.current = "";
+            setUserDraft("");
+          }
+          if (!text) {
+            speechStartedDuringAssistantRef.current = false;
+            if (!responseActiveRef.current && !audioPlayingRef.current)
+              setPhase("listening");
+            continue;
+          }
+          if (isVoiceFiller(text)) {
+            speechStartedDuringAssistantRef.current = false;
+            if (!responseActiveRef.current && !audioPlayingRef.current)
+              setPhase("listening");
+            continue;
+          }
           const assistantSpeech = `${lastAssistantTextRef.current} ${assistantDraftRef.current}`;
           const isEcho =
             speechStartedDuringAssistantRef.current &&
             isLikelyEcho(text, assistantSpeech);
           speechStartedDuringAssistantRef.current = false;
-          if (isEcho) continue;
-          interruptAssistant();
-          appendTranscript({ role: "user", text });
-          if (send({ type: "response.create" })) responseActiveRef.current = true;
-          setPhase("thinking");
+          if (isEcho) {
+            setPhase(
+              audioPlayingRef.current
+                ? "speaking"
+                : responseActiveRef.current
+                  ? "thinking"
+                  : "listening",
+            );
+            continue;
+          }
+          void routeUserTurn(text);
         }
         if (event.type === "response-done") {
           responseActiveRef.current = false;
+          if (
+            event.status === "completed" &&
+            pendingQuestionRef.current &&
+            pendingAnswerRef.current
+          )
+            recordCandidate(pendingQuestionRef.current, pendingAnswerRef.current);
+          pendingQuestionRef.current = "";
+          pendingAnswerRef.current = "";
           if (!audioPlayingRef.current) setPhase("listening");
         }
         if (event.type === "end-conversation") window.setTimeout(stopConversation, 900);
@@ -178,7 +398,14 @@ export function VoiceAssistant() {
         }
       }
     },
-    [appendTranscript, interruptAssistant, resetIdleTimer, send, stopConversation],
+    [
+      appendTranscript,
+      finishGreeting,
+      recordCandidate,
+      resetIdleTimer,
+      routeUserTurn,
+      stopConversation,
+    ],
   );
 
   const startConversation = useCallback(
@@ -234,8 +461,10 @@ export function VoiceAssistant() {
         };
 
         const microphoneTrack = stream?.getAudioTracks()[0];
-        if (stream && microphoneTrack) peer.addTrack(microphoneTrack, stream);
-        else peer.addTransceiver("audio", { direction: "recvonly" });
+        if (stream && microphoneTrack) {
+          microphoneTrack.enabled = false;
+          peer.addTrack(microphoneTrack, stream);
+        } else peer.addTransceiver("audio", { direction: "recvonly" });
 
         channel.addEventListener("message", ({ data }) => {
           if (startGeneration === startGenerationRef.current && typeof data === "string")
@@ -244,17 +473,14 @@ export function VoiceAssistant() {
 
         channel.addEventListener("open", () => {
           if (startGeneration !== startGenerationRef.current) return;
-          channel.send(
-            JSON.stringify({
-              type: "response.create",
-              response: {
-                instructions: `Say exactly: "${INITIAL_GREETING}" Say nothing else. Do not change any word or punctuation.`,
-                output_modalities: ["audio"],
-              },
-            }),
-          );
-          responseActiveRef.current = true;
-          setPhase("thinking");
+          greetingPlayingRef.current = true;
+          if (greetingAudioUrlRef.current)
+            void deliverCachedAnswer(
+              INITIAL_GREETING,
+              greetingAudioUrlRef.current,
+              "exact",
+            );
+          else requestExactSpeech(INITIAL_GREETING);
           resetIdleTimer();
           sessionTimerRef.current = window.setTimeout(
             stopConversation,
@@ -291,6 +517,10 @@ export function VoiceAssistant() {
           throw new Error(body?.message ?? "AI assistant could not start.");
         }
 
+        const remaining = Number(response.headers.get("X-Questions-Remaining"));
+        if (Number.isInteger(remaining)) setQuestionsRemaining(remaining);
+        greetingAudioUrlRef.current = response.headers.get("X-Greeting-Audio");
+
         const answer = await response.text();
         if (startGeneration !== startGenerationRef.current) return;
         if (fetchAbortRef.current === fetchController) fetchAbortRef.current = null;
@@ -306,7 +536,15 @@ export function VoiceAssistant() {
         setPhase("error");
       }
     },
-    [handleServerEvent, model, releaseConnection, resetIdleTimer, stopConversation],
+    [
+      deliverCachedAnswer,
+      handleServerEvent,
+      model,
+      releaseConnection,
+      requestExactSpeech,
+      resetIdleTimer,
+      stopConversation,
+    ],
   );
 
   const askQuestion = (event: FormEvent<HTMLFormElement>) => {
@@ -323,16 +561,16 @@ export function VoiceAssistant() {
       },
     });
     if (!accepted) return;
-    appendTranscript({ role: "user", text });
     setQuestion("");
-    setPhase("thinking");
-    resetIdleTimer();
-    if (send({ type: "response.create" })) responseActiveRef.current = true;
+    void routeUserTurn(text);
   };
 
   useEffect(() => releaseConnection, [releaseConnection]);
 
+  const transcriptRevision = `${transcript.length}:${userDraft.length}:${assistantDraft.length}:${phase}`;
+
   useEffect(() => {
+    if (!transcriptRevision) return;
     const transcriptPanel = transcriptRef.current;
     if (!transcriptPanel) return;
     const frame = window.requestAnimationFrame(() => {
@@ -342,7 +580,7 @@ export function VoiceAssistant() {
       });
     });
     return () => window.cancelAnimationFrame(frame);
-  });
+  }, [transcriptRevision]);
 
   const active = phase !== "idle";
   const connected = channelRef.current?.readyState === "open";
@@ -351,6 +589,18 @@ export function VoiceAssistant() {
   return (
     <div className={`voice-guide${active ? " is-active" : ""}`}>
       <audio ref={audioRef} autoPlay className="sr-only">
+        <track kind="captions" />
+      </audio>
+      <audio
+        ref={cachedAudioRef}
+        className="sr-only"
+        preload="auto"
+        onEnded={() => {
+          audioPlayingRef.current = false;
+          finishGreeting();
+          setPhase("listening");
+        }}
+      >
         <track kind="captions" />
       </audio>
 
@@ -450,7 +700,43 @@ export function VoiceAssistant() {
                       </Select.Portal>
                     </Select.Root>
                   </div>
-                ) : null}
+                ) : (
+                  <Popover.Root>
+                    <Popover.Trigger
+                      className="voice-quota-trigger"
+                      aria-label="Weekly AI answer allowance"
+                    >
+                      <strong>{questionsRemaining ?? "–"}</strong>
+                      <span>
+                        {questionsRemaining === 1 ? "question" : "questions"} left
+                      </span>
+                      <Info aria-hidden="true" />
+                    </Popover.Trigger>
+                    <Popover.Portal>
+                      <Popover.Positioner
+                        className="voice-quota-positioner"
+                        sideOffset={8}
+                        align="end"
+                      >
+                        <Popover.Popup className="voice-quota-popup">
+                          <Popover.Title className="voice-quota-title">
+                            How Free answers work
+                          </Popover.Title>
+                          <Popover.Description className="voice-quota-description">
+                            Each visitor gets 10 live AI answers every seven days. A Free
+                            tag means your question matched a verified answer and voice
+                            prepared in advance, so no new spoken answer had to be
+                            generated and your quota stays unchanged. The answer still
+                            joins the conversation, so follow-up questions keep their
+                            context. Other questions use live AI and reduce your
+                            allowance. This hybrid approach keeps the assistant fast,
+                            consistent, and affordable.
+                          </Popover.Description>
+                        </Popover.Popup>
+                      </Popover.Positioner>
+                    </Popover.Portal>
+                  </Popover.Root>
+                )}
                 <button
                   type="button"
                   className="voice-end-button"
@@ -478,14 +764,35 @@ export function VoiceAssistant() {
                 </p>
               ) : null}
               {transcript.map((entry) => (
-                <div
-                  className={`voice-message is-${entry.role}`}
-                  key={`${entry.role}:${entry.text}`}
-                >
+                <div className={`voice-message is-${entry.role}`} key={entry.id}>
                   <span>{entry.role === "user" ? "You" : "Assistant"}</span>
-                  <p>{entry.text}</p>
+                  <p>
+                    {entry.text}
+                    {entry.source === "faq" ? (
+                      <small
+                        className="voice-message-badge"
+                        title="Cached FAQ answer — no quota used"
+                      >
+                        Free
+                      </small>
+                    ) : null}
+                    {import.meta.env.DEV && entry.matchedBy === "semantic" ? (
+                      <small
+                        className="voice-message-badge is-semantic"
+                        title="Matched to a cached FAQ by meaning"
+                      >
+                        Semantic
+                      </small>
+                    ) : null}
+                  </p>
                 </div>
               ))}
+              {userDraft ? (
+                <div className="voice-message is-user is-streaming">
+                  <span>You</span>
+                  <p>{userDraft}</p>
+                </div>
+              ) : null}
               {assistantDraft ? (
                 <div className="voice-message is-assistant is-streaming">
                   <span>Assistant</span>

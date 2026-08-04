@@ -4,6 +4,11 @@ import profile from "@/content/anthony-profile.md?raw";
 import { INITIAL_GREETING } from "@/lib/realtime";
 import { DEFAULT_REALTIME_MODEL, isRealtimeModel } from "@/lib/realtime-models";
 import { takeSessionSlot } from "@/lib/realtime-rate-limit";
+import {
+  applyVisitorCookie,
+  hasValidRequestOrigin,
+  initializeAssistant,
+} from "@/server/assistant-backend.server";
 
 const OPENAI_REALTIME_URL = "https://api.openai.com/v1/realtime/calls";
 const MAX_SDP_LENGTH = 24_000;
@@ -129,8 +134,7 @@ export async function createRealtimeSession(request: Request) {
     return jsonError("OPENAI_NOT_CONFIGURED", "AI assistant is not configured yet.", 503);
 
   const requestUrl = new URL(request.url);
-  const origin = request.headers.get("origin");
-  if (origin && origin !== requestUrl.origin)
+  if (!hasValidRequestOrigin(request))
     return jsonError("INVALID_ORIGIN", "Request origin is not allowed.", 403);
 
   if (request.headers.get("content-type")?.split(";")[0] !== "application/sdp")
@@ -145,6 +149,21 @@ export async function createRealtimeSession(request: Request) {
     return jsonError("RATE_LIMITED", "Too many voice sessions. Try again later.", 429, {
       "Retry-After": "600",
     });
+
+  let assistant: Awaited<ReturnType<typeof initializeAssistant>>;
+  try {
+    assistant = await initializeAssistant(request);
+  } catch (error) {
+    console.error(
+      "Assistant backend unavailable",
+      error instanceof Error ? error.message : "Error",
+    );
+    return jsonError(
+      "ASSISTANT_BACKEND_UNAVAILABLE",
+      "AI assistant is temporarily unavailable.",
+      503,
+    );
+  }
 
   const form = new FormData();
   form.set("sdp", sdp);
@@ -176,12 +195,18 @@ export async function createRealtimeSession(request: Request) {
       );
     }
 
+    const headers = new Headers({
+      "Cache-Control": "no-store",
+      "Content-Type": "application/sdp",
+      "X-Questions-Remaining": String(assistant.remaining),
+    });
+    if (assistant.greeting?.audioUrl)
+      headers.set("X-Greeting-Audio", assistant.greeting.audioUrl);
+    applyVisitorCookie(headers, assistant.cookie);
+
     return new Response(body, {
       status: 201,
-      headers: {
-        "Cache-Control": "no-store",
-        "Content-Type": "application/sdp",
-      },
+      headers,
     });
   } catch (error) {
     console.error(

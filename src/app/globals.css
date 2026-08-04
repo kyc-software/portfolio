@@ -625,6 +625,80 @@ a[href]:active {
   white-space: nowrap;
 }
 
+.voice-quota-trigger {
+  display: flex;
+  gap: 0.3rem;
+  align-items: center;
+  min-width: 7.6rem;
+  padding: 0.48rem 0.62rem;
+  cursor: pointer;
+  border: 1px solid rgba(103, 232, 249, 0.22);
+  border-radius: 0.7rem;
+  background: rgba(103, 232, 249, 0.06);
+  color: rgba(241, 238, 232, 0.62);
+  font-size: 0.58rem;
+  white-space: nowrap;
+  transition:
+    border-color 160ms ease,
+    background 160ms ease;
+}
+
+.voice-quota-trigger:hover,
+.voice-quota-trigger[data-popup-open] {
+  border-color: rgba(103, 232, 249, 0.58);
+  background: rgba(103, 232, 249, 0.1);
+}
+
+.voice-quota-trigger strong {
+  color: var(--cyan);
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 0.72rem;
+}
+
+.voice-quota-trigger svg {
+  width: 0.72rem;
+  margin-left: auto;
+  color: rgba(103, 232, 249, 0.68);
+}
+
+.voice-quota-positioner {
+  z-index: 60;
+}
+
+.voice-quota-popup {
+  width: min(21rem, calc(100vw - 2rem));
+  padding: 0.9rem;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 0.85rem;
+  background: rgba(11, 14, 16, 0.98);
+  box-shadow: 0 1rem 3rem rgba(0, 0, 0, 0.5);
+  transform-origin: var(--transform-origin);
+  transition:
+    opacity 140ms ease,
+    scale 140ms ease;
+}
+
+.voice-quota-popup[data-starting-style],
+.voice-quota-popup[data-ending-style] {
+  opacity: 0;
+  scale: 0.97;
+}
+
+.voice-quota-title {
+  margin: 0;
+  color: var(--paper);
+  font-family: var(--font-lexend), sans-serif;
+  font-size: 0.75rem;
+  font-weight: 540;
+}
+
+.voice-quota-description {
+  margin: 0.42rem 0 0;
+  color: rgba(241, 238, 232, 0.58);
+  font-size: 0.68rem;
+  line-height: 1.5;
+}
+
 .voice-arrow {
   width: 4.65rem;
   height: 3rem;
@@ -702,9 +776,9 @@ a[href]:active {
   bottom: clamp(3rem, 7vh, 5rem);
   left: 50%;
   display: grid;
-  width: min(44rem, calc(100vw - 2.5rem));
+  width: min(54rem, calc(100vw - 3rem));
+  height: min(44rem, calc(100svh - 5rem));
   grid-template-rows: auto minmax(0, 1fr) auto;
-  max-height: min(36rem, calc(100svh - 7rem));
   overflow: hidden;
   border: 1px solid rgba(255, 255, 255, 0.15);
   border-radius: 1.5rem;
@@ -805,8 +879,8 @@ a[href]:active {
   display: grid;
   gap: 1rem;
   align-content: start;
-  min-height: 11rem;
-  padding: 1.2rem;
+  min-height: 0;
+  padding: 1.4rem;
   overflow-y: auto;
   overscroll-behavior: contain;
 }
@@ -837,7 +911,7 @@ a[href]:active {
 .voice-message {
   display: grid;
   gap: 0.28rem;
-  width: min(88%, 34rem);
+  width: min(88%, 42rem);
 }
 
 .voice-message.is-user {
@@ -871,6 +945,28 @@ a[href]:active {
   border-color: rgba(103, 232, 249, 0.22);
   border-radius: 0.95rem 0.95rem 0.25rem 0.95rem;
   background: rgba(103, 232, 249, 0.08);
+}
+
+.voice-message-badge {
+  display: inline-flex;
+  margin-left: 0.5rem;
+  padding: 0.1rem 0.32rem;
+  border: 1px solid rgba(103, 232, 249, 0.3);
+  border-radius: 999px;
+  background: rgba(103, 232, 249, 0.08);
+  color: var(--cyan);
+  font-size: 0.5rem;
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  line-height: 1;
+  text-transform: uppercase;
+  vertical-align: 0.12rem;
+}
+
+.voice-message-badge.is-semantic {
+  border-color: rgba(196, 181, 253, 0.32);
+  background: rgba(139, 92, 246, 0.1);
+  color: rgb(196, 181, 253);
 }
 
 .voice-message.is-streaming p::after {
@@ -2095,20 +2191,45 @@ a[href]:active {
   }
 
   .voice-panel {
-    right: 0;
-    bottom: 0;
-    left: 0;
+    inset: 0;
     width: 100%;
-    max-height: min(38rem, calc(100svh - 3.5rem));
-    border-right: 0;
-    border-bottom: 0;
-    border-left: 0;
-    border-radius: 1.35rem 1.35rem 0 0;
+    height: 100dvh;
+    border: 0;
+    border-radius: 0;
     transform: none;
   }
 
+  .voice-panel-header {
+    padding: calc(0.8rem + env(safe-area-inset-top)) 1rem 0.8rem;
+  }
+
+  .voice-panel-actions {
+    gap: 0.45rem;
+  }
+
   .voice-transcript {
-    min-height: 9rem;
+    padding: 1rem;
+  }
+
+  .voice-message {
+    width: min(92%, 42rem);
+  }
+
+  .voice-question {
+    padding: 0.8rem 1rem calc(0.8rem + env(safe-area-inset-bottom));
+  }
+
+  .voice-quota-trigger {
+    min-width: 0;
+    padding: 0.48rem;
+  }
+
+  .voice-quota-trigger > span {
+    display: none;
+  }
+
+  .voice-quota-trigger svg {
+    margin-left: 0;
   }
 
   .voice-panel-actions .voice-model-picker {
