@@ -1,7 +1,17 @@
 import { Collapsible } from "@base-ui/react/collapsible";
 import { Popover } from "@base-ui/react/popover";
 import { Select } from "@base-ui/react/select";
-import { Check, ChevronDown, Info, LoaderCircle, Mic, Send } from "lucide-react";
+import {
+  Check,
+  ChevronDown,
+  Info,
+  LoaderCircle,
+  Mic,
+  MicOff,
+  Send,
+  Volume2,
+  VolumeX,
+} from "lucide-react";
 import { type FormEvent, useCallback, useEffect, useRef, useState } from "react";
 
 import { isVoiceFiller } from "@/lib/assistant-copy";
@@ -62,12 +72,13 @@ function fetchPreparedQuestions() {
   });
 }
 
-function statusLabel(phase: Phase, textOnly: boolean) {
+function statusLabel(phase: Phase, textOnly: boolean, microphoneMuted: boolean) {
   if (phase === "connecting") return "Connecting";
   if (phase === "thinking") return "Thinking";
   if (phase === "speaking") return "Speaking";
   if (phase === "error") return "Unavailable";
-  return textOnly ? "Type a question" : "Listening";
+  if (textOnly) return "Type a question";
+  return microphoneMuted ? "Microphone muted" : "Listening";
 }
 
 function activityLabel(phase: Phase) {
@@ -189,14 +200,19 @@ export function VoiceAssistant() {
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
   const [textOnly, setTextOnly] = useState(false);
+  const [microphoneUnavailable, setMicrophoneUnavailable] = useState(false);
   const [preparedReady, setPreparedReady] = useState(false);
   const [realtimeReady, setRealtimeReady] = useState(false);
+  const [outputMuted, setOutputMuted] = useState(false);
+  const [microphoneMuted, setMicrophoneMuted] = useState(false);
   const [model, setModel] = useState<RealtimeModel>(DEFAULT_REALTIME_MODEL);
   const [questionsRemaining, setQuestionsRemaining] = useState<number | null>(null);
 
   const peerRef = useRef<RTCPeerConnection | null>(null);
   const channelRef = useRef<RTCDataChannel | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const microphoneContextRef = useRef<AudioContext | null>(null);
+  const microphoneGainRef = useRef<GainNode | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const cachedAudioRef = useRef<HTMLAudioElement | null>(null);
   const transcriptRef = useRef<HTMLDivElement | null>(null);
@@ -207,6 +223,7 @@ export function VoiceAssistant() {
   const lastAssistantTextRef = useRef("");
   const responseActiveRef = useRef(false);
   const audioPlayingRef = useRef(false);
+  const microphoneMutedRef = useRef(false);
   const greetingPlayingRef = useRef(false);
   const closeAfterCachedAudioRef = useRef(false);
   const speechStartedDuringAssistantRef = useRef(false);
@@ -234,13 +251,17 @@ export function VoiceAssistant() {
     const channel = channelRef.current;
     const peer = peerRef.current;
     const stream = streamRef.current;
+    const microphoneContext = microphoneContextRef.current;
     channelRef.current = null;
     peerRef.current = null;
     streamRef.current = null;
+    microphoneContextRef.current = null;
+    microphoneGainRef.current = null;
     fetchAbortRef.current = null;
     channel?.close();
     peer?.close();
     for (const track of stream?.getTracks() ?? []) track.stop();
+    void microphoneContext?.close();
     if (audioRef.current) {
       audioRef.current.pause();
       audioRef.current.srcObject = null;
@@ -297,6 +318,7 @@ export function VoiceAssistant() {
     setError("");
     setNotice("");
     setTextOnly(false);
+    setMicrophoneUnavailable(false);
     setPreparedReady(false);
     setQuestionsRemaining(null);
   }, [releaseConnection]);
@@ -337,11 +359,28 @@ export function VoiceAssistant() {
     [send],
   );
 
+  const applyMicrophoneMute = useCallback((muted: boolean) => {
+    const context = microphoneContextRef.current;
+    const gain = microphoneGainRef.current;
+    if (context && gain) {
+      gain.gain.setValueAtTime(muted ? 0 : 1, context.currentTime);
+      return;
+    }
+    for (const track of streamRef.current?.getAudioTracks() ?? []) track.enabled = !muted;
+  }, []);
+
   const finishGreeting = useCallback(() => {
     if (!greetingPlayingRef.current) return;
     greetingPlayingRef.current = false;
-    for (const track of streamRef.current?.getAudioTracks() ?? []) track.enabled = true;
-  }, []);
+    applyMicrophoneMute(microphoneMutedRef.current);
+  }, [applyMicrophoneMute]);
+
+  const toggleMicrophone = useCallback(() => {
+    const nextMuted = !microphoneMutedRef.current;
+    microphoneMutedRef.current = nextMuted;
+    setMicrophoneMuted(nextMuted);
+    applyMicrophoneMute(nextMuted || greetingPlayingRef.current);
+  }, [applyMicrophoneMute]);
 
   const interruptAssistant = useCallback(() => {
     if (responseActiveRef.current) send({ type: "response.cancel" });
@@ -606,6 +645,7 @@ export function VoiceAssistant() {
       setError("");
       setNotice("");
       setTextOnly(false);
+      setMicrophoneUnavailable(false);
       setPreparedReady(false);
 
       try {
@@ -639,8 +679,14 @@ export function VoiceAssistant() {
       }
 
       try {
-        if (!("RTCPeerConnection" in window))
-          throw new Error("WebRTC is not supported by this browser.");
+        if (!("RTCPeerConnection" in window)) {
+          setTextOnly(true);
+          setNotice(
+            "Live voice is not supported in this browser. Prepared questions still work.",
+          );
+          if (!audioPlayingRef.current) setPhase("listening");
+          return;
+        }
 
         let stream: MediaStream | null = null;
         try {
@@ -657,16 +703,33 @@ export function VoiceAssistant() {
             for (const track of stream.getTracks()) track.stop();
             return;
           }
-        } catch (microphoneError) {
+        } catch {
           if (startGeneration !== startGenerationRef.current) return;
-          const blocked =
-            microphoneError instanceof DOMException &&
-            ["NotAllowedError", "NotFoundError", "NotSupportedError"].includes(
-              microphoneError.name,
-            );
-          if (!blocked) throw microphoneError;
           setTextOnly(true);
+          setMicrophoneUnavailable(true);
           setNotice("Microphone unavailable. Type a question instead.");
+        }
+
+        let outgoingStream = stream;
+        if (stream) {
+          let context: AudioContext | null = null;
+          try {
+            context = new AudioContext();
+            if (context.state === "suspended") await context.resume();
+            const source = context.createMediaStreamSource(stream);
+            const gain = context.createGain();
+            const destination = context.createMediaStreamDestination();
+            gain.gain.value =
+              greetingPlayingRef.current || microphoneMutedRef.current ? 0 : 1;
+            source.connect(gain).connect(destination);
+            microphoneContextRef.current = context;
+            microphoneGainRef.current = gain;
+            outgoingStream = destination.stream;
+          } catch {
+            void context?.close();
+            microphoneContextRef.current = null;
+            microphoneGainRef.current = null;
+          }
         }
 
         const peer = new RTCPeerConnection();
@@ -679,10 +742,12 @@ export function VoiceAssistant() {
           if (audioRef.current && streams[0]) audioRef.current.srcObject = streams[0];
         };
 
-        const microphoneTrack = stream?.getAudioTracks()[0];
-        if (stream && microphoneTrack) {
-          microphoneTrack.enabled = !greetingPlayingRef.current;
-          peer.addTrack(microphoneTrack, stream);
+        const microphoneTrack = outgoingStream?.getAudioTracks()[0];
+        if (outgoingStream && microphoneTrack) {
+          if (!microphoneGainRef.current)
+            microphoneTrack.enabled =
+              !greetingPlayingRef.current && !microphoneMutedRef.current;
+          peer.addTrack(microphoneTrack, outgoingStream);
         } else peer.addTransceiver("audio", { direction: "recvonly" });
 
         channel.addEventListener("message", ({ data }) => {
@@ -800,13 +865,14 @@ export function VoiceAssistant() {
 
   return (
     <div className={`voice-guide${active ? " is-active" : ""}`}>
-      <audio ref={audioRef} autoPlay className="sr-only">
+      <audio ref={audioRef} autoPlay muted={outputMuted} className="sr-only">
         <track kind="captions" />
       </audio>
       <audio
         ref={cachedAudioRef}
         className="sr-only"
         preload="auto"
+        muted={outputMuted}
         onEnded={() => {
           audioPlayingRef.current = false;
           finishGreeting();
@@ -853,7 +919,7 @@ export function VoiceAssistant() {
                 <span className={`voice-status-dot is-${phase}`} />
                 <div>
                   <h2 id="voice-title">Anthony AI assistant</h2>
-                  <p>{statusLabel(phase, textOnly)}</p>
+                  <p>{statusLabel(phase, textOnly, microphoneMuted)}</p>
                 </div>
               </div>
               <div className="voice-panel-actions">
@@ -947,10 +1013,57 @@ export function VoiceAssistant() {
                 </Popover.Root>
                 <button
                   type="button"
+                  className="voice-mute-button"
+                  onClick={toggleMicrophone}
+                  disabled={microphoneUnavailable}
+                  aria-label={
+                    microphoneUnavailable
+                      ? "Microphone unavailable"
+                      : microphoneMuted
+                        ? "Unmute microphone"
+                        : "Mute microphone"
+                  }
+                  aria-pressed={microphoneMuted}
+                  title={
+                    microphoneUnavailable
+                      ? "Microphone unavailable"
+                      : microphoneMuted
+                        ? "Unmute microphone"
+                        : "Mute microphone"
+                  }
+                >
+                  {microphoneMuted ? (
+                    <MicOff aria-hidden="true" />
+                  ) : (
+                    <Mic aria-hidden="true" />
+                  )}
+                </button>
+                <button
+                  type="button"
+                  className="voice-mute-button"
+                  onClick={() => setOutputMuted((current) => !current)}
+                  aria-label={
+                    outputMuted ? "Unmute assistant audio" : "Mute assistant audio"
+                  }
+                  aria-pressed={outputMuted}
+                  title={outputMuted ? "Unmute assistant audio" : "Mute assistant audio"}
+                >
+                  {outputMuted ? (
+                    <VolumeX aria-hidden="true" />
+                  ) : (
+                    <Volume2 aria-hidden="true" />
+                  )}
+                </button>
+                <button
+                  type="button"
                   className="voice-end-button"
                   onClick={stopConversation}
+                  aria-label="End conversation"
                 >
-                  End conversation
+                  <span className="voice-end-label-full">End conversation</span>
+                  <span className="voice-end-label-short" aria-hidden="true">
+                    End
+                  </span>
                 </button>
               </div>
             </header>

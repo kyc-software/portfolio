@@ -850,6 +850,61 @@ a[href]:active {
   font-weight: 560;
 }
 
+.voice-mute-button {
+  display: grid;
+  width: 2.45rem;
+  height: 2.45rem;
+  place-items: center;
+  flex: 0 0 auto;
+  padding: 0;
+  cursor: pointer;
+  border: 1px solid rgba(74, 222, 128, 0.34);
+  border-radius: 999px;
+  background: rgba(74, 222, 128, 0.07);
+  color: #86efac;
+  transition:
+    border-color 160ms ease,
+    background 160ms ease,
+    color 160ms ease;
+}
+
+.voice-mute-button:not(:disabled):not([aria-pressed="true"]):hover {
+  border-color: rgba(74, 222, 128, 0.58);
+  background: rgba(74, 222, 128, 0.12);
+  color: #bbf7d0;
+}
+
+.voice-mute-button:disabled {
+  cursor: not-allowed;
+  border-color: rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.045);
+  color: rgba(241, 238, 232, 0.72);
+  opacity: 0.35;
+}
+
+.voice-mute-button[aria-pressed="true"] {
+  border-color: rgba(251, 191, 36, 0.52);
+  background: rgba(251, 191, 36, 0.12);
+  color: #fcd34d;
+}
+
+.voice-mute-button:focus-visible {
+  outline: 2px solid #4ade80;
+  outline-offset: 2px;
+}
+
+.voice-mute-button[aria-pressed="true"]:focus-visible {
+  outline-color: #fbbf24;
+}
+
+.voice-mute-button svg {
+  width: 1rem;
+}
+
+.voice-end-label-short {
+  display: none;
+}
+
 .voice-end-button:hover {
   border-color: #fb7185;
   background: rgba(251, 113, 133, 0.16);
@@ -2320,6 +2375,21 @@ a[href]:active {
 
   .voice-panel-actions {
     gap: 0.45rem;
+  }
+
+  .voice-mute-button {
+    width: 2.75rem;
+    height: 2.75rem;
+  }
+
+  @media (max-width: 360px) {
+    .voice-end-label-full {
+      display: none;
+    }
+
+    .voice-end-label-short {
+      display: inline;
+    }
   }
 
   .voice-transcript {
