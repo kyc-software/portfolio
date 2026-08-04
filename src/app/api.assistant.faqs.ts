@@ -23,7 +23,7 @@ export const Route = createFileRoute("/api/assistant/faqs")({
             error instanceof Error ? error.message : "Error",
           );
           return Response.json(
-            { message: "Prepared questions are temporarily unavailable." },
+            { message: "Curated questions are temporarily unavailable." },
             { status: 503 },
           );
         }

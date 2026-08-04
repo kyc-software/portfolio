@@ -5,7 +5,7 @@ import {
   WHO_ARE_YOU_ANSWER,
 } from "../src/lib/assistant-copy";
 
-export const FAQ_CATALOG_VERSION = "2026-08-04-51-v4";
+export const FAQ_CATALOG_VERSION = "2026-08-04-51-v5";
 
 type PreparedFaq = {
   key: string;

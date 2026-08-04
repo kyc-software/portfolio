@@ -1,5 +1,5 @@
 export const INITIAL_GREETING =
-  "Hello, I'm Anthony's AI assistant, what can I do for you ?";
+  "Hello, I'm Anthony's AI assistant, I can answer any question about his professional experiences, what would you like to know ?";
 
 export const WHO_ARE_YOU_ANSWER =
   "I am Anthony's AI assistant and I am here to answer your question about his experiences.";

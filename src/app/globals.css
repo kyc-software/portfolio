@@ -818,6 +818,12 @@ a[href]:active {
   gap: 0.65rem;
 }
 
+.voice-panel-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+}
+
 .voice-panel-header p {
   margin: 0;
   color: var(--cyan);
@@ -2370,10 +2376,30 @@ a[href]:active {
   }
 
   .voice-panel-header {
+    position: relative;
+    gap: 0.65rem;
     padding: calc(0.8rem + env(safe-area-inset-top)) 1rem 0.8rem;
   }
 
+  .voice-panel-identity {
+    min-width: 0;
+    padding-bottom: 0.85rem;
+  }
+
+  .voice-panel-identity > div {
+    min-width: 0;
+  }
+
+  .voice-panel-header h2 {
+    font-size: 0.82rem;
+    white-space: nowrap;
+  }
+
   .voice-panel-actions {
+    display: flex;
+  }
+
+  .voice-panel-controls {
     gap: 0.45rem;
   }
 
@@ -2413,12 +2439,39 @@ a[href]:active {
   }
 
   .voice-quota-trigger {
+    position: absolute;
+    bottom: 0.5rem;
+    left: 2.08rem;
+    width: fit-content;
+    height: auto;
     min-width: 0;
-    padding: 0.48rem;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    font-size: 0.52rem;
+    font-weight: 590;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
   }
 
   .voice-quota-trigger > span {
-    display: none;
+    display: inline;
+  }
+
+  .voice-quota-trigger strong {
+    font-size: 0.6rem;
+  }
+
+  .voice-quota-trigger svg {
+    width: 0.64rem;
+    margin-left: 0.15rem;
+  }
+
+  .voice-quota-trigger:hover,
+  .voice-quota-trigger[data-popup-open] {
+    background: transparent;
   }
 
   .voice-quota-trigger svg {

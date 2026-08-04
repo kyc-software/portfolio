@@ -32,7 +32,7 @@ import { takeSessionSlot } from "../src/lib/realtime-rate-limit.ts";
 test("uses fixed opening greeting", () => {
   assert.equal(
     INITIAL_GREETING,
-    "Hello, I'm Anthony's AI assistant, what can I do for you ?",
+    "Hello, I'm Anthony's AI assistant, I can answer any question about his professional experiences, what would you like to know ?",
   );
 });
 

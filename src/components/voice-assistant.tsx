@@ -145,8 +145,8 @@ function FreeQuestionPicker({
       <Collapsible.Trigger className="voice-free-questions-trigger">
         <span>
           {userTurnCount === 0
-            ? "Start with a prepared question"
-            : "Browse prepared questions"}
+            ? "Start with a curated question"
+            : "Browse curated questions"}
         </span>
         <ChevronDown aria-hidden="true" />
       </Collapsible.Trigger>
@@ -183,7 +183,7 @@ function FreeQuestionPicker({
           </ul>
         ) : (
           <span className="voice-free-questions-empty">
-            No prepared questions available right now.
+            No curated questions available right now.
           </span>
         )}
       </Collapsible.Panel>
@@ -203,8 +203,8 @@ export function VoiceAssistant() {
   const [microphoneUnavailable, setMicrophoneUnavailable] = useState(false);
   const [preparedReady, setPreparedReady] = useState(false);
   const [realtimeReady, setRealtimeReady] = useState(false);
-  const [outputMuted, setOutputMuted] = useState(false);
-  const [microphoneMuted, setMicrophoneMuted] = useState(false);
+  const [outputMuted, setOutputMuted] = useState(import.meta.env.DEV);
+  const [microphoneMuted, setMicrophoneMuted] = useState(import.meta.env.DEV);
   const [model, setModel] = useState<RealtimeModel>(DEFAULT_REALTIME_MODEL);
   const [questionsRemaining, setQuestionsRemaining] = useState<number | null>(null);
 
@@ -223,7 +223,7 @@ export function VoiceAssistant() {
   const lastAssistantTextRef = useRef("");
   const responseActiveRef = useRef(false);
   const audioPlayingRef = useRef(false);
-  const microphoneMutedRef = useRef(false);
+  const microphoneMutedRef = useRef(import.meta.env.DEV);
   const greetingPlayingRef = useRef(false);
   const closeAfterCachedAudioRef = useRef(false);
   const speechStartedDuringAssistantRef = useRef(false);
@@ -650,7 +650,7 @@ export function VoiceAssistant() {
 
       try {
         const response = await fetch("/api/assistant/initialize");
-        if (!response.ok) throw new Error("Prepared questions could not start.");
+        if (!response.ok) throw new Error("Curated questions could not start.");
         const assistant = (await response.json()) as AssistantInitialization;
         if (!assistant.allowed) throw new Error("Assistant is busy. Try again shortly.");
         if (startGeneration !== startGenerationRef.current) return;
@@ -672,7 +672,7 @@ export function VoiceAssistant() {
         setError(
           initializationError instanceof Error
             ? initializationError.message
-            : "Prepared questions could not start.",
+            : "Curated questions could not start.",
         );
         setPhase("error");
         return;
@@ -682,7 +682,7 @@ export function VoiceAssistant() {
         if (!("RTCPeerConnection" in window)) {
           setTextOnly(true);
           setNotice(
-            "Live voice is not supported in this browser. Prepared questions still work.",
+            "Live voice is not supported in this browser. Curated questions still work.",
           );
           if (!audioPlayingRef.current) setPhase("listening");
           return;
@@ -768,7 +768,7 @@ export function VoiceAssistant() {
           if (peerRef.current !== peer) return;
           releaseRealtime();
           setTextOnly(true);
-          setNotice("Live AI is unavailable. Prepared questions still work.");
+          setNotice("Live AI is unavailable. Curated questions still work.");
           if (!audioPlayingRef.current) setPhase("listening");
         });
 
@@ -805,7 +805,7 @@ export function VoiceAssistant() {
         if (startGeneration !== startGenerationRef.current) return;
         releaseRealtime();
         setTextOnly(true);
-        setNotice("Live AI is unavailable. Prepared questions still work.");
+        setNotice("Live AI is unavailable. Curated questions still work.");
         if (!audioPlayingRef.current) setPhase("listening");
       }
     },
@@ -1004,68 +1004,72 @@ export function VoiceAssistant() {
                         </Popover.Title>
                         <Popover.Description className="voice-quota-description">
                           You can ask up to 20 questions per week that need a new AI
-                          answer. "Prepared" questions does not reduce your remaining
-                          quota. Ask them in your own words or choose one from the list of
-                          "prepared" questions below.
+                          answer. "Curated" questions do not reduce your remaining quota.
+                          Ask them in your own words or choose one from the list of
+                          "curated" questions below.
                         </Popover.Description>
                       </Popover.Popup>
                     </Popover.Positioner>
                   </Popover.Portal>
                 </Popover.Root>
-                <button
-                  type="button"
-                  className="voice-mute-button"
-                  onClick={toggleMicrophone}
-                  disabled={microphoneUnavailable}
-                  aria-label={
-                    microphoneUnavailable
-                      ? "Microphone unavailable"
-                      : microphoneMuted
-                        ? "Unmute microphone"
-                        : "Mute microphone"
-                  }
-                  aria-pressed={microphoneMuted}
-                  title={
-                    microphoneUnavailable
-                      ? "Microphone unavailable"
-                      : microphoneMuted
-                        ? "Unmute microphone"
-                        : "Mute microphone"
-                  }
-                >
-                  {microphoneMuted ? (
-                    <MicOff aria-hidden="true" />
-                  ) : (
-                    <Mic aria-hidden="true" />
-                  )}
-                </button>
-                <button
-                  type="button"
-                  className="voice-mute-button"
-                  onClick={() => setOutputMuted((current) => !current)}
-                  aria-label={
-                    outputMuted ? "Unmute assistant audio" : "Mute assistant audio"
-                  }
-                  aria-pressed={outputMuted}
-                  title={outputMuted ? "Unmute assistant audio" : "Mute assistant audio"}
-                >
-                  {outputMuted ? (
-                    <VolumeX aria-hidden="true" />
-                  ) : (
-                    <Volume2 aria-hidden="true" />
-                  )}
-                </button>
-                <button
-                  type="button"
-                  className="voice-end-button"
-                  onClick={stopConversation}
-                  aria-label="End conversation"
-                >
-                  <span className="voice-end-label-full">End conversation</span>
-                  <span className="voice-end-label-short" aria-hidden="true">
-                    End
-                  </span>
-                </button>
+                <div className="voice-panel-controls">
+                  <button
+                    type="button"
+                    className="voice-mute-button"
+                    onClick={toggleMicrophone}
+                    disabled={microphoneUnavailable}
+                    aria-label={
+                      microphoneUnavailable
+                        ? "Microphone unavailable"
+                        : microphoneMuted
+                          ? "Unmute microphone"
+                          : "Mute microphone"
+                    }
+                    aria-pressed={microphoneMuted}
+                    title={
+                      microphoneUnavailable
+                        ? "Microphone unavailable"
+                        : microphoneMuted
+                          ? "Unmute microphone"
+                          : "Mute microphone"
+                    }
+                  >
+                    {microphoneMuted ? (
+                      <MicOff aria-hidden="true" />
+                    ) : (
+                      <Mic aria-hidden="true" />
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    className="voice-mute-button"
+                    onClick={() => setOutputMuted((current) => !current)}
+                    aria-label={
+                      outputMuted ? "Unmute assistant audio" : "Mute assistant audio"
+                    }
+                    aria-pressed={outputMuted}
+                    title={
+                      outputMuted ? "Unmute assistant audio" : "Mute assistant audio"
+                    }
+                  >
+                    {outputMuted ? (
+                      <VolumeX aria-hidden="true" />
+                    ) : (
+                      <Volume2 aria-hidden="true" />
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    className="voice-end-button"
+                    onClick={stopConversation}
+                    aria-label="End conversation"
+                  >
+                    <span className="voice-end-label-full">End conversation</span>
+                    <span className="voice-end-label-short" aria-hidden="true">
+                      End
+                    </span>
+                  </button>
+                </div>
               </div>
             </header>
 
@@ -1091,9 +1095,9 @@ export function VoiceAssistant() {
                     {entry.source === "faq" ? (
                       <small
                         className="voice-message-badge"
-                        title="Prepared answer — no quota used"
+                        title="Curated answer — no quota used"
                       >
-                        Prepared
+                        Curated
                       </small>
                     ) : null}
                     {import.meta.env.DEV && entry.matchedBy === "semantic" ? (
@@ -1162,7 +1166,7 @@ export function VoiceAssistant() {
                       onChange={(event) => setQuestion(event.target.value)}
                       placeholder={
                         !preparedReady
-                          ? "Loading prepared questions…"
+                          ? "Loading curated questions…"
                           : connected
                             ? "Ask a question"
                             : "Live AI unavailable"
