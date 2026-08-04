@@ -5,7 +5,7 @@ import {
   WHO_ARE_YOU_ANSWER,
 } from "../src/lib/assistant-copy";
 
-export const FAQ_CATALOG_VERSION = "2026-08-04-50-v3";
+export const FAQ_CATALOG_VERSION = "2026-08-04-51-v4";
 
 type PreparedFaq = {
   key: string;
@@ -631,6 +631,35 @@ export const SEEDED_FAQS = [
       "get in touch",
       "linkedin",
       "message anthony",
+    ],
+  }),
+  prepared({
+    key: "conversation-end",
+    question: "Can we end the conversation?",
+    answer: "You're welcome. Thanks for taking the time to learn about Anthony.",
+    aliases: [
+      "Okay, thank you",
+      "Thanks, that's all",
+      "That's all I need",
+      "Alright, that's all",
+      "I'm done, thank you",
+      "No more questions",
+      "We can stop here",
+      "End the conversation",
+      "Goodbye",
+      "Bye",
+    ],
+    intent: "The visitor is satisfied and wants to end or leave the conversation.",
+    matchSignals: [
+      "thank you",
+      "thanks",
+      "that s all",
+      "i m done",
+      "no more questions",
+      "stop here",
+      "end the conversation",
+      "goodbye",
+      "bye",
     ],
   }),
 ] as const;

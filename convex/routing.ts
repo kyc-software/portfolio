@@ -37,6 +37,7 @@ type RouteResult =
       match: "exact" | "semantic";
       answer: string;
       audioStorageId?: Doc<"faqs">["audioStorageId"];
+      endConversation?: boolean;
       remaining: number;
     }
   | { kind: "realtime"; remaining: number }
@@ -74,6 +75,28 @@ export const routeTurn = internalAction({
         match: "exact" as const,
         answer: exact.answer,
         audioStorageId: exact.audioStorageId,
+        endConversation: exact.key === "conversation-end",
+        remaining: quota.remaining,
+      };
+    }
+
+    const closing = faqs.find(
+      (faq) =>
+        faq.key === "conversation-end" &&
+        faq.matchSignals &&
+        hasSemanticSignal(normalized, faq.matchSignals),
+    );
+    if (closing) {
+      const quota: QuotaResult = await ctx.runMutation(internal.assistant.updateQuota, {
+        visitorToken,
+        reserve: false,
+      });
+      return {
+        kind: "cached" as const,
+        match: "semantic" as const,
+        answer: closing.answer,
+        audioStorageId: closing.audioStorageId,
+        endConversation: true,
         remaining: quota.remaining,
       };
     }
@@ -82,17 +105,24 @@ export const routeTurn = internalAction({
       internal.assistant.updateQuota,
       { visitorToken, reserve: false },
     );
-    if (currentQuota.remaining === 0) return { kind: "limited" as const, remaining: 0 };
 
     const questionWords = normalized.split(" ");
-    const semanticCandidateMetadata = faqs.filter(
+    let semanticCandidateMetadata = faqs.filter(
       (faq) =>
         faq.matchSignals &&
         hasSemanticSignal(normalized, faq.matchSignals) &&
         (hasPortfolioReferent(normalized) ||
+          faq.key === "conversation-end" ||
           (faq.key === "who-are-you" &&
             ["you", "your", "yourself"].some((word) => questionWords.includes(word)))),
     );
+    if (currentQuota.remaining === 0) {
+      semanticCandidateMetadata = semanticCandidateMetadata.filter(
+        (faq) => faq.key === "conversation-end",
+      );
+      if (semanticCandidateMetadata.length === 0)
+        return { kind: "limited" as const, remaining: 0 };
+    }
 
     if (semanticCandidateMetadata.length > 0) {
       try {
@@ -119,6 +149,7 @@ export const routeTurn = internalAction({
             match: "semantic" as const,
             answer: best.answer,
             audioStorageId: best.audioStorageId,
+            endConversation: best.key === "conversation-end",
             remaining: currentQuota.remaining,
           };
         }

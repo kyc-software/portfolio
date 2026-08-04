@@ -36,6 +36,7 @@ type TurnDecision =
       match: "exact" | "semantic";
       answer: string;
       audioUrl: string | null;
+      endConversation?: boolean;
       remaining: number;
     }
   | { kind: "realtime"; remaining: number }
@@ -207,6 +208,7 @@ export function VoiceAssistant() {
   const responseActiveRef = useRef(false);
   const audioPlayingRef = useRef(false);
   const greetingPlayingRef = useRef(false);
+  const closeAfterCachedAudioRef = useRef(false);
   const speechStartedDuringAssistantRef = useRef(false);
   const turnPendingRef = useRef(false);
   const pendingQuestionRef = useRef("");
@@ -272,6 +274,7 @@ export function VoiceAssistant() {
     assistantDraftRef.current = "";
     lastAssistantTextRef.current = "";
     greetingPlayingRef.current = false;
+    closeAfterCachedAudioRef.current = false;
     turnPendingRef.current = false;
     pendingQuestionRef.current = "";
     pendingAnswerRef.current = "";
@@ -347,14 +350,21 @@ export function VoiceAssistant() {
       cachedAudioRef.current.pause();
       cachedAudioRef.current.currentTime = 0;
     }
+    closeAfterCachedAudioRef.current = false;
     responseActiveRef.current = false;
     audioPlayingRef.current = false;
     finishGreeting();
   }, [finishGreeting, send]);
 
   const deliverCachedAnswer = useCallback(
-    async (answer: string, audioUrl: string | null, match: "exact" | "semantic") => {
+    async (
+      answer: string,
+      audioUrl: string | null,
+      match: "exact" | "semantic",
+      endConversation = false,
+    ) => {
       lastAssistantTextRef.current = answer;
+      closeAfterCachedAudioRef.current = endConversation;
       sendHistoryMessage("assistant", answer);
       appendTranscript({
         role: "assistant",
@@ -366,7 +376,8 @@ export function VoiceAssistant() {
       const audio = cachedAudioRef.current;
       if (!audio || !audioUrl) {
         finishGreeting();
-        setPhase("listening");
+        if (endConversation) window.setTimeout(stopConversation, 900);
+        else setPhase("listening");
         return;
       }
 
@@ -379,10 +390,11 @@ export function VoiceAssistant() {
       } catch {
         audioPlayingRef.current = false;
         finishGreeting();
-        setPhase("listening");
+        if (endConversation) window.setTimeout(stopConversation, 900);
+        else setPhase("listening");
       }
     },
-    [appendTranscript, finishGreeting, sendHistoryMessage],
+    [appendTranscript, finishGreeting, sendHistoryMessage, stopConversation],
   );
 
   const routeUserTurn = useCallback(
@@ -437,7 +449,12 @@ export function VoiceAssistant() {
         }
 
         if (decision.kind === "cached") {
-          await deliverCachedAnswer(decision.answer, decision.audioUrl, decision.match);
+          await deliverCachedAnswer(
+            decision.answer,
+            decision.audioUrl,
+            decision.match,
+            decision.endConversation,
+          );
           return;
         }
 
@@ -793,7 +810,8 @@ export function VoiceAssistant() {
         onEnded={() => {
           audioPlayingRef.current = false;
           finishGreeting();
-          setPhase("listening");
+          if (closeAfterCachedAudioRef.current) stopConversation();
+          else setPhase("listening");
         }}
       >
         <track kind="captions" />

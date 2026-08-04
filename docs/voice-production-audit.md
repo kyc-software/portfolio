@@ -5,10 +5,10 @@ Convex production readiness: **5/5 for portfolio-scale production**
 
 ## Verified production state
 
-- Convex catalog version `2026-08-04-50-v3` deployed.
-- 50 prepared questions and one greeting present.
-- 51/51 reusable MP3 files ready; zero failed.
-- 50/50 `text-embedding-3-small` vectors ready at 512 dimensions; zero failed.
+- Convex catalog version `2026-08-04-51-v4` deployed.
+- 51 prepared questions plus greeting present.
+- 52/52 reusable MP3 files ready; zero failed.
+- 51/51 `text-embedding-3-small` vectors ready at 512 dimensions; zero failed.
 - Production Convex limits active: daily 10k/25k warning-disable function calls,
   1/2 GB database I/O, 1/2 GB egress, and 1/2 GB-hours action compute; monthly
   100k/250k calls, 5/10 GB database I/O, 10/20 GB egress, and 1/3 GB-hours compute.
@@ -45,8 +45,10 @@ Convex production readiness: **5/5 for portfolio-scale production**
 - Split Convex bootstrap from OpenAI session authorization. Panel now renders cached
   greeting, quota, and all prepared questions first; Realtime failure leaves prepared
   text and stored audio fully usable.
-- Synchronized development with production baseline: 51 audio files and 50 embeddings
+- Synchronized development with production baseline: 52 audio files and 51 embeddings
   ready with zero failures.
+- Added zero-quota closing intent with deterministic phrase routing, stored goodbye audio,
+  semantic embedding fallback, and panel closure after playback.
 - Added asynchronous candidate learning outside response latency: separate occurrence
   queue, embedding retries, confidence-gated intent grouping, and two-distinct-visitor
   demand threshold.
@@ -60,7 +62,7 @@ Convex production readiness: **5/5 for portfolio-scale production**
 
 ## Final development QA
 
-- Catalog: 51 records, 51 MP3s, 50 baseline embeddings, zero failures.
+- Catalog: 52 records, 52 MP3s, 51 baseline embeddings, zero failures.
 - Cached exact route returned stored text/audio and preserved weekly quota.
 - Semantic route preserved quota and development routing label.
 - Live fallback displayed visitor transcript immediately, showed Thinking marker,
@@ -104,7 +106,7 @@ These need architectural or product decisions:
   file bandwidth, error rate, and action duration.
 - Verify production portfolio environment has `OPENAI_API_KEY`, `CONVEX_SITE_URL`, and
   `CONVEX_BRIDGE_SECRET`; Convex needs matching `BRIDGE_SECRET` plus `OPENAI_API_KEY`.
-- Keep catalog readiness at 51 audio / 50 embeddings / zero failures before each release.
+- Keep catalog readiness at 52 audio / 51 embeddings / zero failures before each release.
 - Review `ready_for_review` candidates; approve only verified proposals. Use rollback for
   any published alias/topic that routes incorrectly.
 - Run one physical-phone smoke test for panel sizing, prepared-list scrolling, audio,

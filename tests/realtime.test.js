@@ -153,12 +153,12 @@ test("compares embeddings with cosine similarity", () => {
   assert.equal(cosineSimilarity([1], [1, 0]), -1);
 });
 
-test("ships exactly 50 complete, unique prepared FAQs", () => {
+test("ships exactly 51 complete, unique prepared FAQs", () => {
   const prepared = SEEDED_FAQS.filter(({ key }) => key !== "greeting");
-  assert.equal(PREPARED_QUESTION_COUNT, 50);
-  assert.equal(prepared.length, 50);
-  assert.equal(new Set(SEEDED_FAQS.map(({ key }) => key)).size, 51);
-  assert.equal(new Set(prepared.map(({ question }) => question)).size, 50);
+  assert.equal(PREPARED_QUESTION_COUNT, 51);
+  assert.equal(prepared.length, 51);
+  assert.equal(new Set(SEEDED_FAQS.map(({ key }) => key)).size, 52);
+  assert.equal(new Set(prepared.map(({ question }) => question)).size, 51);
   assert.equal(
     prepared.every(
       ({ question, answer, aliases, intent, matchSignals }) =>
@@ -168,6 +168,15 @@ test("ships exactly 50 complete, unique prepared FAQs", () => {
         intent.length > 0 &&
         matchSignals.length > 0,
     ),
+    true,
+  );
+  const closing = SEEDED_FAQS.find(({ key }) => key === "conversation-end");
+  assert.equal(
+    closing?.aliases.includes(normalizeAssistantQuestion("Okay, thank you")),
+    true,
+  );
+  assert.equal(
+    closing?.aliases.includes(normalizeAssistantQuestion("That's all I need")),
     true,
   );
 });

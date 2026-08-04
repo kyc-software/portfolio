@@ -49,10 +49,10 @@ bunx convex run --prod assistant:provisionCatalog '{"force":false}'
 bunx convex run --prod assistant:catalogStatus '{}'
 ```
 
-Ready production status is 51 records and audio files, 50 prepared questions, 50
+Ready production status is 52 records and audio files, 51 prepared questions, 51
 embeddings, and zero failures. Explicit provisioning keeps catalog work out of every
 visitor session. Run same commands without `--prod` to keep development on same
-50-question baseline; files and embeddings are generated inside each deployment.
+51-question baseline; files and embeddings are generated inside each deployment.
 
 Deploy later Convex changes with:
 
@@ -97,17 +97,17 @@ routing verification.
   direct cosine comparison, a portfolio-subject gate, intent signals, confidence
   threshold, and runner-up margin. Lightweight metadata is loaded first; only
   signal-eligible vectors cross into semantic routing. This avoids vector-database
-  overhead for 50 bounded intents and rejects unrelated or ambiguous questions.
+  overhead for 51 bounded intents and rejects unrelated or ambiguous questions.
 - `Tony`, `he`, `him`, and `his` are treated as Anthony. Common pronoun questions
   use exact aliases; freer phrasings continue through semantic matching.
-- Fifty prepared topics cover profile, skills, projects, leadership, location,
+- Fifty-one prepared topics cover profile, skills, projects, leadership, location,
   availability, education, and contact. See
   [prepared-questions.md](prepared-questions.md).
 - Chat initializes from Convex before attempting OpenAI Realtime. Cached greeting,
   quota, and prepared questions therefore remain usable when Realtime is unavailable
   or its budget is exhausted. Arbitrary typed and spoken questions stay disabled until
   Realtime connects.
-- Chat footer always exposes a Base UI prepared-question collapsible. Its 50
+- Chat footer always exposes a Base UI prepared-question collapsible. Its 51
   searchable questions load when the initialized panel auto-opens it beside greeting
   and only include FAQs whose stored audio is ready. First user turn collapses it;
   visitor can reopen it anytime. Selecting one follows same turn pipeline and never
@@ -120,6 +120,8 @@ routing verification.
   preserving follow-up context.
 - Missing MP3 still renders its prepared transcript; Realtime availability never gates
   prepared content.
+- Common closing phrases route to a prepared goodbye with stored audio, preserve quota,
+  and close the panel only after playback finishes.
 - Cache misses reserve one credit atomically and use Realtime. Completed answers are
   recorded asynchronously, embedded, and grouped by intent. Two distinct visitors
   must ask a matching question before preparation begins.
@@ -193,7 +195,7 @@ bun run verify
 Automated tests cover FAQ normalization, semantic guards, cosine comparison, filler
 filtering, Realtime events, session limiting, candidate clustering, grounded proposal
 validation, profile synchronization, type safety, formatting, and production build.
-Catalog tests enforce exactly 50 unique and complete baseline prepared questions.
+Catalog tests enforce exactly 51 unique and complete baseline prepared questions.
 Production status confirms all audio and embeddings exist; routing probes confirm
 exact and semantic hits preserve quota. Live generation requires Convex
 `OPENAI_API_KEY`.

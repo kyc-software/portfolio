@@ -9,6 +9,7 @@ export type AssistantTurn =
       match: "exact" | "semantic";
       answer: string;
       audioUrl: string | null;
+      endConversation?: boolean;
       remaining: number;
     }
   | { kind: "realtime"; remaining: number }

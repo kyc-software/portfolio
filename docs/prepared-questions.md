@@ -1,6 +1,6 @@
 # Prepared questions
 
-Production catalog version: `2026-08-04-50-v3`
+Production catalog version: `2026-08-04-51-v4`
 
 This is the code-owned baseline. Approved recurring candidate intents may add deployment-
 local questions or learned aliases in Convex after manual review; they do not replace or
@@ -59,3 +59,4 @@ embedding. Exact or confident semantic matches do not consume visitor quota.
 48. Is Anthony available for opportunities?
 49. What is Anthony's educational background?
 50. How can I contact Anthony?
+51. Can we end the conversation?

@@ -6,7 +6,7 @@ Keep browser-to-OpenAI WebRTC for low-latency speech. Put durable identity,
 weekly quota, distributed abuse limits, FAQ routing, candidate learning, and generated audio in Convex.
 Portfolio server remains only browser-facing trust boundary.
 
-Production catalog contains one session greeting and 50 prepared questions covering
+Production catalog contains one session greeting and 51 prepared questions covering
 profile, skills, projects, leadership, location, availability, education, and
 contact. Canonical inventory: [prepared-questions.md](prepared-questions.md).
 
@@ -194,7 +194,7 @@ and existing IP burst limiting reduce trivial repeated resets.
 ## Cache lifecycle
 
 Catalog provisioning is explicit, idempotent, versioned, and outside visitor session
-startup. It creates or reconciles 51 records and schedules missing audio plus
+startup. It creates or reconciles 52 records and schedules missing audio plus
 intent-embedding generation with a short stagger. `pending`, `ready`, and `failed`
 states prevent duplicate work. Answer changes regenerate audio; intent or embedding
 version changes regenerate embeddings. Routine initialization performs no catalog scan.
@@ -290,7 +290,8 @@ per-play authorization would require proxying audio through a controlled edge/se
 4. Confident semantic matches reuse verified text and MP3 without spending quota.
 5. Ambiguous or unmatched questions atomically reserve quota and use Realtime.
 6. Development marks semantic hits beside Prepared; production shows only Prepared.
-7. Persistent lazy picker gives visitors direct access to all 50 ready cached answers,
+7. Persistent lazy picker gives visitors direct access to all 51 ready cached answers,
    including after live-answer quota is exhausted.
-8. Repeated misses prepare grounded FAQ proposals asynchronously; humans control
+8. Closing phrases use prepared audio, preserve quota, and end UI after playback.
+9. Repeated misses prepare grounded FAQ proposals asynchronously; humans control
    publication and rollback.
