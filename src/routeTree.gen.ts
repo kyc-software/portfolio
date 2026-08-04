@@ -10,33 +10,43 @@
 
 import { Route as rootRouteImport } from './app/__root'
 import { Route as IndexRouteImport } from './app/index'
+import { Route as ApiRealtimeSessionRouteImport } from './app/api.realtime.session'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiRealtimeSessionRoute = ApiRealtimeSessionRouteImport.update({
+  id: '/api/realtime/session',
+  path: '/api/realtime/session',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/api/realtime/session': typeof ApiRealtimeSessionRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/api/realtime/session': typeof ApiRealtimeSessionRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/api/realtime/session': typeof ApiRealtimeSessionRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths: '/' | '/api/realtime/session'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to: '/' | '/api/realtime/session'
+  id: '__root__' | '/' | '/api/realtime/session'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  ApiRealtimeSessionRoute: typeof ApiRealtimeSessionRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -48,11 +58,19 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/realtime/session': {
+      id: '/api/realtime/session'
+      path: '/api/realtime/session'
+      fullPath: '/api/realtime/session'
+      preLoaderRoute: typeof ApiRealtimeSessionRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  ApiRealtimeSessionRoute: ApiRealtimeSessionRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

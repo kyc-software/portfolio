@@ -15,7 +15,7 @@ function securityHeaders(development: boolean) {
     "font-src 'self' data:",
     `connect-src 'self'${development ? " ws: wss:" : ""}`,
     "frame-src 'self' https://bragi-notes.vercel.app https://tingshuo.vercel.app https://loany-simulateur.vercel.app https://bisonflow.com",
-    "media-src 'self'",
+    "media-src 'self' blob:",
     "object-src 'none'",
     "base-uri 'self'",
     "form-action 'self' mailto:",
@@ -25,7 +25,7 @@ function securityHeaders(development: boolean) {
 
   return {
     "Content-Security-Policy": contentSecurityPolicy,
-    "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
+    "Permissions-Policy": "camera=(), microphone=(self), geolocation=()",
     "Referrer-Policy": "strict-origin-when-cross-origin",
     "X-Content-Type-Options": "nosniff",
     "X-Frame-Options": "SAMEORIGIN",

@@ -12,6 +12,14 @@ bun install
 bun run dev
 ```
 
+AI assistant also needs a server-only OpenAI key:
+
+```dotenv
+OPENAI_API_KEY=sk-proj-your-key
+```
+
+Put it in `.env.local`. See [AI assistant architecture and operations](docs/voice-guide.md).
+
 ## Verify and build
 
 ```bash
@@ -28,6 +36,7 @@ bun run start
 ## Content
 
 - Site identity and projects: `src/content/portfolio.ts`
+- AI-assistant profile: `src/content/anthony-profile.md`
 - Hero portrait: `public/assets/portrait-new-transparent-1800.webp`
 - Social preview: `public/og.png`
 - Canonical production URL: set `VITE_SITE_URL` before building

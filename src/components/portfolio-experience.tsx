@@ -27,6 +27,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
+import { VoiceAssistant } from "@/components/voice-assistant";
 import { type Project, projects, siteConfig } from "@/content/portfolio";
 import { getProjectSlug, validateProjects } from "@/lib/portfolio";
 
@@ -479,6 +480,8 @@ export function PortfolioExperience() {
             <p className="hero-chinese" lang="zh-Hant">
               我住在台灣，也還在學中文。
             </p>
+
+            <VoiceAssistant />
 
             <a href="#work" className="scroll-cue">
               <span>Scroll down</span>
