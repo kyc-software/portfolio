@@ -28,6 +28,17 @@ export const ASSISTANT_RATE_LIMITS = {
     period: MINUTE,
     capacity: 10,
   },
+  bootstrapPerVisitor: {
+    kind: "fixed window",
+    rate: 12,
+    period: 10 * MINUTE,
+  },
+  bootstrapGlobal: {
+    kind: "token bucket",
+    rate: 60,
+    period: MINUTE,
+    capacity: 20,
+  },
   browsePerVisitor: {
     kind: "token bucket",
     rate: 6,
@@ -64,9 +75,15 @@ async function consumePair(
   perVisitor:
     | "turnPerVisitor"
     | "sessionPerVisitor"
+    | "bootstrapPerVisitor"
     | "browsePerVisitor"
     | "candidatePerVisitor",
-  global: "turnGlobal" | "sessionGlobal" | "browseGlobal" | "candidateGlobal",
+  global:
+    | "turnGlobal"
+    | "sessionGlobal"
+    | "bootstrapGlobal"
+    | "browseGlobal"
+    | "candidateGlobal",
 ) {
   const visitor = await rateLimiter.limit(ctx, perVisitor, { key });
   if (!visitor.ok) return visitor;
@@ -79,6 +96,10 @@ export function limitAssistantTurn(ctx: MutationCtx, visitorToken: string) {
 
 export function limitAssistantSession(ctx: MutationCtx, visitorToken: string) {
   return consumePair(ctx, visitorToken, "sessionPerVisitor", "sessionGlobal");
+}
+
+export function limitAssistantBootstrap(ctx: MutationCtx, visitorToken: string) {
+  return consumePair(ctx, visitorToken, "bootstrapPerVisitor", "bootstrapGlobal");
 }
 
 export function limitAssistantBrowse(ctx: MutationCtx, visitorToken: string) {

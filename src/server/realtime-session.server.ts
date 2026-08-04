@@ -6,8 +6,8 @@ import { DEFAULT_REALTIME_MODEL, isRealtimeModel } from "@/lib/realtime-models";
 import { takeSessionSlot } from "@/lib/realtime-rate-limit";
 import {
   applyVisitorCookie,
+  authorizeAssistantSession,
   hasValidRequestOrigin,
-  initializeAssistant,
 } from "@/server/assistant-backend.server";
 
 const OPENAI_REALTIME_URL = "https://api.openai.com/v1/realtime/calls";
@@ -150,9 +150,9 @@ export async function createRealtimeSession(request: Request) {
       "Retry-After": "600",
     });
 
-  let assistant: Awaited<ReturnType<typeof initializeAssistant>>;
+  let authorization: Awaited<ReturnType<typeof authorizeAssistantSession>>;
   try {
-    assistant = await initializeAssistant(request);
+    authorization = await authorizeAssistantSession(request);
   } catch (error) {
     console.error(
       "Assistant backend unavailable",
@@ -165,11 +165,11 @@ export async function createRealtimeSession(request: Request) {
     );
   }
 
-  if (!assistant.allowed) {
+  if (!authorization.ok) {
     const headers = new Headers({
-      "Retry-After": String(Math.max(1, Math.ceil(assistant.retryAfter / 1000))),
+      "Retry-After": String(Math.max(1, Math.ceil(authorization.retryAfter / 1000))),
     });
-    applyVisitorCookie(headers, assistant.cookie);
+    applyVisitorCookie(headers, authorization.cookie);
     return jsonError(
       "RATE_LIMITED",
       "Too many voice sessions. Try again shortly.",
@@ -211,11 +211,8 @@ export async function createRealtimeSession(request: Request) {
     const headers = new Headers({
       "Cache-Control": "no-store",
       "Content-Type": "application/sdp",
-      "X-Questions-Remaining": String(assistant.remaining),
     });
-    if (assistant.greeting?.audioUrl)
-      headers.set("X-Greeting-Audio", assistant.greeting.audioUrl);
-    applyVisitorCookie(headers, assistant.cookie);
+    applyVisitorCookie(headers, authorization.cookie);
 
     return new Response(body, {
       status: 201,

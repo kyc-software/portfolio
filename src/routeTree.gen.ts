@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './app/__root'
 import { Route as IndexRouteImport } from './app/index'
 import { Route as ApiAssistantCandidateRouteImport } from './app/api.assistant.candidate'
 import { Route as ApiAssistantFaqsRouteImport } from './app/api.assistant.faqs'
+import { Route as ApiAssistantInitializeRouteImport } from './app/api.assistant.initialize'
 import { Route as ApiAssistantTurnRouteImport } from './app/api.assistant.turn'
 import { Route as ApiRealtimeSessionRouteImport } from './app/api.realtime.session'
 
@@ -30,6 +31,11 @@ const ApiAssistantFaqsRoute = ApiAssistantFaqsRouteImport.update({
   path: '/api/assistant/faqs',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiAssistantInitializeRoute = ApiAssistantInitializeRouteImport.update({
+  id: '/api/assistant/initialize',
+  path: '/api/assistant/initialize',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiAssistantTurnRoute = ApiAssistantTurnRouteImport.update({
   id: '/api/assistant/turn',
   path: '/api/assistant/turn',
@@ -45,6 +51,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/api/assistant/candidate': typeof ApiAssistantCandidateRoute
   '/api/assistant/faqs': typeof ApiAssistantFaqsRoute
+  '/api/assistant/initialize': typeof ApiAssistantInitializeRoute
   '/api/assistant/turn': typeof ApiAssistantTurnRoute
   '/api/realtime/session': typeof ApiRealtimeSessionRoute
 }
@@ -52,6 +59,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/api/assistant/candidate': typeof ApiAssistantCandidateRoute
   '/api/assistant/faqs': typeof ApiAssistantFaqsRoute
+  '/api/assistant/initialize': typeof ApiAssistantInitializeRoute
   '/api/assistant/turn': typeof ApiAssistantTurnRoute
   '/api/realtime/session': typeof ApiRealtimeSessionRoute
 }
@@ -60,6 +68,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/api/assistant/candidate': typeof ApiAssistantCandidateRoute
   '/api/assistant/faqs': typeof ApiAssistantFaqsRoute
+  '/api/assistant/initialize': typeof ApiAssistantInitializeRoute
   '/api/assistant/turn': typeof ApiAssistantTurnRoute
   '/api/realtime/session': typeof ApiRealtimeSessionRoute
 }
@@ -69,6 +78,7 @@ export interface FileRouteTypes {
     | '/'
     | '/api/assistant/candidate'
     | '/api/assistant/faqs'
+    | '/api/assistant/initialize'
     | '/api/assistant/turn'
     | '/api/realtime/session'
   fileRoutesByTo: FileRoutesByTo
@@ -76,6 +86,7 @@ export interface FileRouteTypes {
     | '/'
     | '/api/assistant/candidate'
     | '/api/assistant/faqs'
+    | '/api/assistant/initialize'
     | '/api/assistant/turn'
     | '/api/realtime/session'
   id:
@@ -83,6 +94,7 @@ export interface FileRouteTypes {
     | '/'
     | '/api/assistant/candidate'
     | '/api/assistant/faqs'
+    | '/api/assistant/initialize'
     | '/api/assistant/turn'
     | '/api/realtime/session'
   fileRoutesById: FileRoutesById
@@ -91,6 +103,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ApiAssistantCandidateRoute: typeof ApiAssistantCandidateRoute
   ApiAssistantFaqsRoute: typeof ApiAssistantFaqsRoute
+  ApiAssistantInitializeRoute: typeof ApiAssistantInitializeRoute
   ApiAssistantTurnRoute: typeof ApiAssistantTurnRoute
   ApiRealtimeSessionRoute: typeof ApiRealtimeSessionRoute
 }
@@ -118,6 +131,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAssistantFaqsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/assistant/initialize': {
+      id: '/api/assistant/initialize'
+      path: '/api/assistant/initialize'
+      fullPath: '/api/assistant/initialize'
+      preLoaderRoute: typeof ApiAssistantInitializeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/assistant/turn': {
       id: '/api/assistant/turn'
       path: '/api/assistant/turn'
@@ -139,6 +159,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ApiAssistantCandidateRoute: ApiAssistantCandidateRoute,
   ApiAssistantFaqsRoute: ApiAssistantFaqsRoute,
+  ApiAssistantInitializeRoute: ApiAssistantInitializeRoute,
   ApiAssistantTurnRoute: ApiAssistantTurnRoute,
   ApiRealtimeSessionRoute: ApiRealtimeSessionRoute,
 }

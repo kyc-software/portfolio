@@ -51,7 +51,8 @@ bunx convex run --prod assistant:catalogStatus '{}'
 
 Ready production status is 51 records and audio files, 50 prepared questions, 50
 embeddings, and zero failures. Explicit provisioning keeps catalog work out of every
-visitor session and leaves development data unchanged.
+visitor session. Run same commands without `--prod` to keep development on same
+50-question baseline; files and embeddings are generated inside each deployment.
 
 Deploy later Convex changes with:
 
@@ -74,6 +75,8 @@ Set Convex development variables:
 ```bash
 bunx convex env set BRIDGE_SECRET <development-secret>
 bunx convex env set OPENAI_API_KEY <your-key>
+bunx convex run assistant:provisionCatalog '{"force":false}'
+bunx convex run assistant:catalogStatus '{}'
 bun run dev
 ```
 
@@ -100,8 +103,12 @@ routing verification.
 - Fifty prepared topics cover profile, skills, projects, leadership, location,
   availability, education, and contact. See
   [prepared-questions.md](prepared-questions.md).
+- Chat initializes from Convex before attempting OpenAI Realtime. Cached greeting,
+  quota, and prepared questions therefore remain usable when Realtime is unavailable
+  or its budget is exhausted. Arbitrary typed and spoken questions stay disabled until
+  Realtime connects.
 - Chat footer always exposes a Base UI prepared-question collapsible. Its 50
-  searchable questions load when the ready session auto-opens it beside greeting
+  searchable questions load when the initialized panel auto-opens it beside greeting
   and only include FAQs whose stored audio is ready. First user turn collapses it;
   visitor can reopen it anytime. Selecting one follows same turn pipeline and never
   spends live-answer quota. Expanded results are capped below half chat height and
@@ -111,8 +118,8 @@ routing verification.
   deduplicated promise; browser private caching remains a secondary layer.
 - Stored MP3 plays locally while cached assistant text enters same Realtime history,
   preserving follow-up context.
-- Missing MP3 falls back to exact Realtime speech, so feature remains usable during
-  setup or Speech API failure.
+- Missing MP3 still renders its prepared transcript; Realtime availability never gates
+  prepared content.
 - Cache misses reserve one credit atomically, use Realtime, then upsert question and
   answer into `candidates` for later FAQ review. Candidates never auto-promote.
 - Common microphone fillers are ignored without spending quota.
@@ -138,6 +145,7 @@ routing verification.
 - `convex/http.ts`: shared-secret HTTP bridge.
 - `src/server/assistant-backend.server.ts`: cookie and Convex client boundary.
 - `src/app/api.assistant.turn.ts`: browser cache/quota route.
+- `src/app/api.assistant.initialize.ts`: quota and cached-greeting bootstrap route.
 - `src/app/api.assistant.faqs.ts`: lazy prepared-question listing route.
 - `src/app/api.assistant.candidate.ts`: completed miss logging.
 - `src/server/realtime-session.server.ts`: prompt, validation, OpenAI handshake.
@@ -153,7 +161,8 @@ routing verification.
 - Convex mutation makes quota check/increment atomic across tabs and deployments.
 - Convex rate-limiter component adds distributed visitor and global limits before
   expensive or repeatable work. Current policy: turns 12/minute with burst 2 per
-  visitor; starts 4/10 minutes; prepared-list reads 6/minute with burst 2; candidate
+  visitor; starts 4/10 minutes; panel bootstraps 12/10 minutes; prepared-list reads
+  6/minute with burst 2; candidate
   writes 10/hour with burst 3. Global ceilings cover cookie rotation/distributed abuse.
 - Deployment warning and hard-disable limits cap daily/monthly function calls,
   database I/O, egress, and action compute.

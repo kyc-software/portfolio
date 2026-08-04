@@ -39,6 +39,21 @@ const initialize = httpAction(async (ctx, request) => {
   });
 });
 
+const session = httpAction(async (ctx, request) => {
+  if (!authorized(request)) return json({ error: "Unauthorized" }, 401);
+  const body = (await request.json().catch(() => null)) as {
+    visitorToken?: unknown;
+  } | null;
+  if (typeof body?.visitorToken !== "string" || body.visitorToken.length > 100)
+    return json({ error: "Invalid visitor" }, 400);
+
+  return json(
+    await ctx.runMutation(internal.assistant.limitSession, {
+      visitorToken: body.visitorToken,
+    }),
+  );
+});
+
 const turn = httpAction(async (ctx, request) => {
   if (!authorized(request)) return json({ error: "Unauthorized" }, 401);
   const body = (await request.json().catch(() => null)) as {
@@ -112,6 +127,7 @@ const faqs = httpAction(async (ctx, request) => {
 
 const http = httpRouter();
 http.route({ path: "/assistant/initialize", method: "POST", handler: initialize });
+http.route({ path: "/assistant/session", method: "POST", handler: session });
 http.route({ path: "/assistant/turn", method: "POST", handler: turn });
 http.route({ path: "/assistant/candidate", method: "POST", handler: candidate });
 http.route({ path: "/assistant/faqs", method: "POST", handler: faqs });

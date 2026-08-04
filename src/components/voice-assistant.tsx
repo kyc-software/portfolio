@@ -22,6 +22,13 @@ import {
 type Phase = "idle" | "connecting" | "listening" | "thinking" | "speaking" | "error";
 type TranscriptItem = TranscriptEntry & { id: number };
 type FreeQuestion = { key: string; question: string };
+type AssistantInitialization =
+  | { allowed: false; retryAfter: number }
+  | {
+      allowed: true;
+      remaining: number;
+      greeting: { answer: string; audioUrl: string | null } | null;
+    };
 
 type TurnDecision =
   | {
@@ -181,6 +188,8 @@ export function VoiceAssistant() {
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
   const [textOnly, setTextOnly] = useState(false);
+  const [preparedReady, setPreparedReady] = useState(false);
+  const [realtimeReady, setRealtimeReady] = useState(false);
   const [model, setModel] = useState<RealtimeModel>(DEFAULT_REALTIME_MODEL);
   const [questionsRemaining, setQuestionsRemaining] = useState<number | null>(null);
 
@@ -203,7 +212,9 @@ export function VoiceAssistant() {
   const pendingQuestionRef = useRef("");
   const pendingAnswerRef = useRef("");
   const turnBlockedUntilRef = useRef(0);
-  const greetingAudioUrlRef = useRef<string | null>(null);
+  const queuedHistoryRef = useRef<Array<{ role: "user" | "assistant"; text: string }>>(
+    [],
+  );
   const fetchAbortRef = useRef<AbortController | null>(null);
   const idleTimerRef = useRef<number | null>(null);
   const sessionTimerRef = useRef<number | null>(null);
@@ -216,41 +227,59 @@ export function VoiceAssistant() {
     sessionTimerRef.current = null;
   }, []);
 
-  const releaseConnection = useCallback(() => {
-    clearTimers();
+  const releaseRealtime = useCallback(() => {
     fetchAbortRef.current?.abort();
-    channelRef.current?.close();
-    peerRef.current?.close();
-    for (const track of streamRef.current?.getTracks() ?? []) track.stop();
+    const channel = channelRef.current;
+    const peer = peerRef.current;
+    const stream = streamRef.current;
+    channelRef.current = null;
+    peerRef.current = null;
+    streamRef.current = null;
+    fetchAbortRef.current = null;
+    channel?.close();
+    peer?.close();
+    for (const track of stream?.getTracks() ?? []) track.stop();
     if (audioRef.current) {
       audioRef.current.pause();
       audioRef.current.srcObject = null;
     }
+    userDraftRef.current = "";
+    userDraftItemRef.current = "";
+    assistantDraftRef.current = "";
+    responseActiveRef.current = false;
+    audioPlayingRef.current = Boolean(
+      cachedAudioRef.current && !cachedAudioRef.current.paused,
+    );
+    speechStartedDuringAssistantRef.current = false;
+    pendingQuestionRef.current = "";
+    pendingAnswerRef.current = "";
+    setRealtimeReady(false);
+    setUserDraft("");
+    setAssistantDraft("");
+  }, []);
+
+  const releaseConnection = useCallback(() => {
+    clearTimers();
+    releaseRealtime();
     if (cachedAudioRef.current) {
       cachedAudioRef.current.pause();
       cachedAudioRef.current.removeAttribute("src");
       cachedAudioRef.current.load();
     }
-    fetchAbortRef.current = null;
-    channelRef.current = null;
-    peerRef.current = null;
-    streamRef.current = null;
+    audioPlayingRef.current = false;
     userDraftRef.current = "";
     userDraftItemRef.current = "";
     assistantDraftRef.current = "";
     lastAssistantTextRef.current = "";
-    responseActiveRef.current = false;
-    audioPlayingRef.current = false;
     greetingPlayingRef.current = false;
-    speechStartedDuringAssistantRef.current = false;
     turnPendingRef.current = false;
     pendingQuestionRef.current = "";
     pendingAnswerRef.current = "";
     turnBlockedUntilRef.current = 0;
-    greetingAudioUrlRef.current = null;
+    queuedHistoryRef.current = [];
     setUserDraft("");
     setAssistantDraft("");
-  }, [clearTimers]);
+  }, [clearTimers, releaseRealtime]);
 
   const stopConversation = useCallback(() => {
     startGenerationRef.current += 1;
@@ -265,6 +294,7 @@ export function VoiceAssistant() {
     setError("");
     setNotice("");
     setTextOnly(false);
+    setPreparedReady(false);
     setQuestionsRemaining(null);
   }, [releaseConnection]);
 
@@ -284,6 +314,26 @@ export function VoiceAssistant() {
     return true;
   }, []);
 
+  const sendHistoryMessage = useCallback(
+    (role: "user" | "assistant", text: string) => {
+      const accepted = send({
+        type: "conversation.item.create",
+        item: {
+          type: "message",
+          role,
+          content: [
+            role === "user"
+              ? { type: "input_text", text }
+              : { type: "output_text", text },
+          ],
+        },
+      });
+      if (!accepted) queuedHistoryRef.current.push({ role, text });
+      return accepted;
+    },
+    [send],
+  );
+
   const finishGreeting = useCallback(() => {
     if (!greetingPlayingRef.current) return;
     greetingPlayingRef.current = false;
@@ -302,28 +352,21 @@ export function VoiceAssistant() {
     finishGreeting();
   }, [finishGreeting, send]);
 
-  const requestExactSpeech = useCallback(
-    (answer: string) => {
-      const accepted = send({
-        type: "response.create",
-        response: {
-          instructions: `Say exactly: "${answer}" Say nothing else. Do not change any word or punctuation.`,
-          output_modalities: ["audio"],
-        },
-      });
-      if (!accepted) return false;
-      responseActiveRef.current = true;
-      setPhase("thinking");
-      return true;
-    },
-    [send],
-  );
-
   const deliverCachedAnswer = useCallback(
     async (answer: string, audioUrl: string | null, match: "exact" | "semantic") => {
+      lastAssistantTextRef.current = answer;
+      sendHistoryMessage("assistant", answer);
+      appendTranscript({
+        role: "assistant",
+        text: answer,
+        source: "faq",
+        ...(match === "semantic" ? { matchedBy: "semantic" as const } : {}),
+      });
+
       const audio = cachedAudioRef.current;
       if (!audio || !audioUrl) {
-        requestExactSpeech(answer);
+        finishGreeting();
+        setPhase("listening");
         return;
       }
 
@@ -333,27 +376,13 @@ export function VoiceAssistant() {
         audioPlayingRef.current = true;
         setPhase("speaking");
         await audio.play();
-        lastAssistantTextRef.current = answer;
-        send({
-          type: "conversation.item.create",
-          item: {
-            type: "message",
-            role: "assistant",
-            content: [{ type: "output_text", text: answer }],
-          },
-        });
-        appendTranscript({
-          role: "assistant",
-          text: answer,
-          source: "faq",
-          ...(match === "semantic" ? { matchedBy: "semantic" as const } : {}),
-        });
       } catch {
         audioPlayingRef.current = false;
-        requestExactSpeech(answer);
+        finishGreeting();
+        setPhase("listening");
       }
     },
-    [appendTranscript, requestExactSpeech, send],
+    [appendTranscript, finishGreeting, sendHistoryMessage],
   );
 
   const routeUserTurn = useCallback(
@@ -560,6 +589,37 @@ export function VoiceAssistant() {
       setError("");
       setNotice("");
       setTextOnly(false);
+      setPreparedReady(false);
+
+      try {
+        const response = await fetch("/api/assistant/initialize");
+        if (!response.ok) throw new Error("Prepared questions could not start.");
+        const assistant = (await response.json()) as AssistantInitialization;
+        if (!assistant.allowed) throw new Error("Assistant is busy. Try again shortly.");
+        if (startGeneration !== startGenerationRef.current) return;
+
+        setQuestionsRemaining(assistant.remaining);
+        setPreparedReady(true);
+        resetIdleTimer();
+        sessionTimerRef.current = window.setTimeout(stopConversation, SESSION_TIMEOUT_MS);
+
+        const greeting = assistant.greeting ?? {
+          answer: INITIAL_GREETING,
+          audioUrl: null,
+        };
+        greetingPlayingRef.current = Boolean(greeting.audioUrl);
+        void deliverCachedAnswer(greeting.answer, greeting.audioUrl, "exact");
+      } catch (initializationError) {
+        if (startGeneration !== startGenerationRef.current) return;
+        releaseConnection();
+        setError(
+          initializationError instanceof Error
+            ? initializationError.message
+            : "Prepared questions could not start.",
+        );
+        setPhase("error");
+        return;
+      }
 
       try {
         if (!("RTCPeerConnection" in window))
@@ -604,7 +664,7 @@ export function VoiceAssistant() {
 
         const microphoneTrack = stream?.getAudioTracks()[0];
         if (stream && microphoneTrack) {
-          microphoneTrack.enabled = false;
+          microphoneTrack.enabled = !greetingPlayingRef.current;
           peer.addTrack(microphoneTrack, stream);
         } else peer.addTransceiver("audio", { direction: "recvonly" });
 
@@ -615,23 +675,19 @@ export function VoiceAssistant() {
 
         channel.addEventListener("open", () => {
           if (startGeneration !== startGenerationRef.current) return;
-          greetingPlayingRef.current = true;
-          if (greetingAudioUrlRef.current)
-            void deliverCachedAnswer(
-              INITIAL_GREETING,
-              greetingAudioUrlRef.current,
-              "exact",
-            );
-          else requestExactSpeech(INITIAL_GREETING);
+          setRealtimeReady(true);
+          for (const entry of queuedHistoryRef.current.splice(0))
+            sendHistoryMessage(entry.role, entry.text);
+          if (!audioPlayingRef.current) setPhase("listening");
           resetIdleTimer();
-          sessionTimerRef.current = window.setTimeout(
-            stopConversation,
-            SESSION_TIMEOUT_MS,
-          );
         });
 
         channel.addEventListener("close", () => {
-          if (peerRef.current === peer) stopConversation();
+          if (peerRef.current !== peer) return;
+          releaseRealtime();
+          setTextOnly(true);
+          setNotice("Live AI is unavailable. Prepared questions still work.");
+          if (!audioPlayingRef.current) setPhase("listening");
         });
 
         const offer = await peer.createOffer();
@@ -659,23 +715,16 @@ export function VoiceAssistant() {
           throw new Error(body?.message ?? "AI assistant could not start.");
         }
 
-        const remaining = Number(response.headers.get("X-Questions-Remaining"));
-        if (Number.isInteger(remaining)) setQuestionsRemaining(remaining);
-        greetingAudioUrlRef.current = response.headers.get("X-Greeting-Audio");
-
         const answer = await response.text();
         if (startGeneration !== startGenerationRef.current) return;
         if (fetchAbortRef.current === fetchController) fetchAbortRef.current = null;
         await peer.setRemoteDescription({ type: "answer", sdp: answer });
-      } catch (connectionError) {
+      } catch {
         if (startGeneration !== startGenerationRef.current) return;
-        releaseConnection();
-        setError(
-          connectionError instanceof Error
-            ? connectionError.message
-            : "AI assistant could not start.",
-        );
-        setPhase("error");
+        releaseRealtime();
+        setTextOnly(true);
+        setNotice("Live AI is unavailable. Prepared questions still work.");
+        if (!audioPlayingRef.current) setPhase("listening");
       }
     },
     [
@@ -683,8 +732,9 @@ export function VoiceAssistant() {
       handleServerEvent,
       model,
       releaseConnection,
-      requestExactSpeech,
+      releaseRealtime,
       resetIdleTimer,
+      sendHistoryMessage,
       stopConversation,
     ],
   );
@@ -694,19 +744,11 @@ export function VoiceAssistant() {
       if (!text.trim()) return;
       const trimmed = text.trim();
       interruptAssistant();
-      const accepted = send({
-        type: "conversation.item.create",
-        item: {
-          type: "message",
-          role: "user",
-          content: [{ type: "input_text", text: trimmed }],
-        },
-      });
-      if (!accepted) return;
+      sendHistoryMessage("user", trimmed);
       setQuestion("");
       void routeUserTurn(trimmed);
     },
-    [interruptAssistant, routeUserTurn, send],
+    [interruptAssistant, routeUserTurn, sendHistoryMessage],
   );
 
   const askQuestion = (event: FormEvent<HTMLFormElement>) => {
@@ -734,7 +776,7 @@ export function VoiceAssistant() {
   }, [transcriptRevision]);
 
   const active = phase !== "idle";
-  const connected = channelRef.current?.readyState === "open";
+  const connected = realtimeReady;
   const selectedModelInfo = REALTIME_MODELS.find((option) => option.id === model);
   const activeActivityLabel = activityLabel(phase);
   const userTurnCount = transcript.filter((entry) => entry.role === "user").length;
@@ -953,7 +995,15 @@ export function VoiceAssistant() {
                   <span>{activeActivityLabel}</span>
                 </div>
               ) : null}
-              {notice ? <p className="voice-notice">{notice}</p> : null}
+              {notice ? (
+                <p
+                  className={`voice-notice${
+                    notice.startsWith("Live AI") ? " is-warning" : ""
+                  }`}
+                >
+                  {notice}
+                </p>
+              ) : null}
               {error ? <p className="voice-error">{error}</p> : null}
             </div>
 
@@ -969,7 +1019,7 @@ export function VoiceAssistant() {
             ) : (
               <div className="voice-panel-footer">
                 <FreeQuestionPicker
-                  disabled={!connected}
+                  disabled={!preparedReady}
                   onSelect={submitQuestion}
                   userTurnCount={userTurnCount}
                 />
@@ -981,7 +1031,11 @@ export function VoiceAssistant() {
                       value={question}
                       onChange={(event) => setQuestion(event.target.value)}
                       placeholder={
-                        phase === "connecting" ? "Connecting…" : "Ask a question"
+                        !preparedReady
+                          ? "Loading prepared questions…"
+                          : connected
+                            ? "Ask a question"
+                            : "Live AI unavailable"
                       }
                       maxLength={500}
                       disabled={!connected}

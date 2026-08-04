@@ -11,6 +11,7 @@ import {
 import { createEmbedding, EMBEDDING_VERSION } from "./embeddings";
 import { FAQ_CATALOG_VERSION, PREPARED_QUESTION_COUNT, SEEDED_FAQS } from "./faqCatalog";
 import {
+  limitAssistantBootstrap,
   limitAssistantBrowse,
   limitAssistantCandidate,
   limitAssistantSession,
@@ -161,11 +162,11 @@ export const provisionCatalog = internalMutation({
 export const initialize = internalMutation({
   args: { visitorToken: v.string() },
   handler: async (ctx, { visitorToken }) => {
-    const sessionLimit = await limitAssistantSession(ctx, visitorToken);
-    if (!sessionLimit.ok)
+    const bootstrapLimit = await limitAssistantBootstrap(ctx, visitorToken);
+    if (!bootstrapLimit.ok)
       return {
         allowed: false as const,
-        retryAfter: sessionLimit.retryAfter,
+        retryAfter: bootstrapLimit.retryAfter,
       };
 
     const now = Date.now();
@@ -210,6 +211,11 @@ export const initialize = internalMutation({
         : null,
     };
   },
+});
+
+export const limitSession = internalMutation({
+  args: { visitorToken: v.string() },
+  handler: (ctx, { visitorToken }) => limitAssistantSession(ctx, visitorToken),
 });
 
 export const limitTurn = internalMutation({

@@ -40,28 +40,29 @@ Release confidence: **4.5/5 for portfolio-scale production**
   database I/O, egress, and action compute.
 - Deduplicated and cached prepared-question metadata for one page visit without adding
   query-state machinery.
+- Split Convex bootstrap from OpenAI session authorization. Panel now renders cached
+  greeting, quota, and all prepared questions first; Realtime failure leaves prepared
+  text and stored audio fully usable.
+- Synchronized development with production baseline: 51 audio files and 50 embeddings
+  ready with zero failures.
 
 ## Major improvements not implemented
 
 These need architectural or product decisions:
 
-1. **Prepared-only startup.** Opening chat currently creates OpenAI Realtime session
-   before visitor chooses prepared question. Delaying Realtime until first uncached or
-   spoken turn would materially reduce idle/prepared-only cost, but changes microphone,
-   greeting, and handoff behavior.
-2. **Strict quota enforcement.** Browser owns Realtime data channel and a determined user
+1. **Strict quota enforcement.** Browser owns Realtime data channel and a determined user
    can send `response.create` outside normal turn route. Hard enforcement needs server
    sideband control or server-owned Realtime orchestration.
-3. **Strict stored-audio enforcement.** Issued Convex storage URLs can be replayed until
+2. **Strict stored-audio enforcement.** Issued Convex storage URLs can be replayed until
    expiry. Global URL-issuance limits and deployment egress hard limits contain exposure;
    authenticated per-play control needs an edge/server audio proxy and would add latency.
-4. **Identity-resistant distributed abuse.** Anonymous cookie can be erased. Global
+3. **Identity-resistant distributed abuse.** Anonymous cookie can be erased. Global
    Convex limits contain aggregate traffic, but strong actor identity needs sign-in or
    edge/network signals. Convex recommends a separate edge for custom network policies.
-5. **Measured semantic quality.** Production probes pass representative cases, but no
+4. **Measured semantic quality.** Production probes pass representative cases, but no
    labeled precision/recall suite exists for all intents. Threshold changes should wait for
    a real evaluation corpus built from candidate logs.
-6. **Prompt retrieval.** Realtime receives full roughly 4,000-word profile. Stable prompt
+5. **Prompt retrieval.** Realtime receives full roughly 4,000-word profile. Stable prompt
    prefix and retention-ratio truncation help caching, but selective retrieval could reduce
    recurring input cost and latency. This is a larger grounding architecture change.
 

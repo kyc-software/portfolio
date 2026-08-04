@@ -42,8 +42,8 @@ flowchart LR
 - Narrow intent signals prevent unrelated questions from reaching semantically
   similar FAQs; confidence and runner-up margin reject ambiguous matches.
 - Convex action generates MP3 once and stores resulting blob.
-- Browser inserts cached assistant text into Realtime conversation before local
-  audio playback, preserving follow-up context.
+- Browser renders and plays cached content independently. When Realtime connects,
+  queued cached conversation history is inserted for follow-up context.
 - Persistent chat-footer picker stays visible but fetches prepared questions only
   when visitor expands it. Convex returns only searchable FAQs with ready audio.
 
@@ -60,15 +60,26 @@ sequenceDiagram
   participant Speech as OpenAI Speech
 
   Visitor->>Browser: Start conversation
-  Browser->>Portfolio: POST WebRTC offer
+  Browser->>Portfolio: Initialize assistant
   Portfolio->>Portfolio: Read or issue HttpOnly visitor cookie
   Portfolio->>Convex: Initialize visitor
-  Convex->>Convex: Enforce visitor + global session limits
   Convex->>Convex: Load quota and greeting
   Convex-->>Portfolio: Remaining quota + greeting URL when ready
+  Portfolio-->>Browser: Cached bootstrap
+  Browser->>Browser: Render panel and play cached greeting
+  par Prepared path is ready
+    Browser->>Portfolio: GET prepared questions
+  and Realtime connects independently
+    Browser->>Portfolio: POST WebRTC offer
+    Portfolio->>Convex: Enforce visitor + global session limits
+  end
   Portfolio->>Realtime: Create WebRTC session
-  Realtime-->>Browser: WebRTC answer
-  Browser->>Browser: Play cached greeting or use Realtime fallback
+  alt Realtime available
+    Realtime-->>Browser: WebRTC answer
+    Browser->>Realtime: Flush queued cached conversation history
+  else Realtime unavailable
+    Browser->>Browser: Keep prepared questions and cached audio available
+  end
 ```
 
 ## Turn sequence
@@ -125,7 +136,7 @@ sequenceDiagram
   participant Portfolio as Portfolio server
   participant Convex
 
-  Browser->>Browser: Ready session auto-opens picker beside greeting
+  Browser->>Browser: Initialized panel auto-opens picker beside greeting
   Browser->>Portfolio: GET prepared questions
   Portfolio->>Convex: Authorized FAQ-list request
   Convex->>Convex: Enforce visitor + global browse limits
@@ -137,8 +148,8 @@ sequenceDiagram
   Browser->>Browser: Run normal turn pipeline
 ```
 
-Question labels are curated catalog data provisioned explicitly during deployment. Ready
-session auto-opens and fetches picker once; first user turn collapses it, with manual
+Question labels are curated catalog data provisioned explicitly during deployment. Initialized
+panel auto-opens and fetches picker once; first user turn collapses it, with manual
 reopening always available. One page-lifetime promise caches and deduplicates the list;
 failed requests remain retryable. HTTP response may also be privately cached for five
 minutes. UI accepts arbitrary catalog size;
@@ -163,6 +174,7 @@ including prepared paths:
 
 - Turns: visitor burst 2, refilling 12/minute; global burst 60, refilling 300/minute.
 - Session starts: 4/10 minutes per visitor; global burst 10, refilling 30/minute.
+- Panel bootstraps: 12/10 minutes per visitor; global burst 20, refilling 60/minute.
 - Prepared-list reads: visitor burst 2, refilling 6/minute; global burst 30,
   refilling 120/minute. Page cache normally makes this one request per visit.
 - Candidate writes: visitor burst 3, refilling 10/hour; global burst 30,
@@ -189,6 +201,8 @@ version changes regenerate embeddings. Routine initialization performs no catalo
 Audio files are immutable Convex storage objects. FAQ rows keep storage ID;
 request-time lookup resolves current URL. Replacements remove superseded stored audio.
 Catalog answers remain code-owned and deployment reconciliation is required after edits.
+Development and production use same catalog source but provision deployment-local
+records, storage files, and embeddings independently.
 
 Cache-miss candidates are stored but never auto-promoted. Review occurrence data,
 then add deliberate aliases, intent signals, and verified answer/audio entries.

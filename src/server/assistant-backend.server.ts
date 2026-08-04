@@ -23,6 +23,10 @@ export type AssistantInitialization =
       greeting: { answer: string; audioUrl: string | null } | null;
     };
 
+export type AssistantSessionAuthorization =
+  | { ok: true }
+  | { ok: false; retryAfter: number };
+
 export type FreeQuestion = { key: string; question: string };
 
 function visitorCookie(request: Request) {
@@ -89,6 +93,23 @@ export async function initializeAssistant(request: Request) {
       greeting: null,
       cookie: visitor.header,
     };
+  }
+}
+
+export async function authorizeAssistantSession(request: Request) {
+  const visitor = visitorCookie(request);
+  try {
+    const result = await callConvex<AssistantSessionAuthorization>("/assistant/session", {
+      visitorToken: visitor.token,
+    });
+    return { ...result, cookie: visitor.header };
+  } catch (error) {
+    if (!import.meta.env.DEV) throw error;
+    console.warn(
+      "Convex session authorization unavailable in development",
+      error instanceof Error ? error.message : "Error",
+    );
+    return { ok: true as const, cookie: visitor.header };
   }
 }
 
