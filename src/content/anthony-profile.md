@@ -232,7 +232,9 @@ Designed and built this portfolio as a high-performance, static-first product ex
 - Built with React 19, TypeScript, TanStack Start, Nitro, Tailwind CSS, Base UI, and responsive accessible interaction patterns.
 - Used prerendered HTML for the landing experience while retaining server-route support for focused dynamic capabilities.
 - Designed the visual system, motion, lazy project previews, content architecture, metadata, security headers, and deployment setup.
-- Added a profile-grounded OpenAI Realtime voice assistant using browser WebRTC, short-lived server-created sessions, fresh context per conversation, transcript controls, strict topic scope, and server-only API credentials without requiring a persistent backend database.
+- Built a profile-grounded OpenAI Realtime voice assistant using browser WebRTC, short-lived server-created sessions, fresh context per conversation, live transcripts, interruption handling, strict topic scope, and server-only credentials.
+- Designed a cost-aware hybrid answer pipeline with Convex: exact FAQ matching, guarded semantic intent matching with OpenAI embeddings, anonymous weekly quotas, atomic usage accounting, reusable OpenAI speech audio in file storage, and cache-candidate analytics.
+- Added transparent Prepared and development-only Semantic routing labels, a lazy and scalable Base UI prepared-question picker with bounded scrolling, concise spoken answers, labeled initialization/thinking states, and responsive full-screen mobile conversation UX.
 
 ### DAKA / Renwu / DAKA Labs - Project Management SaaS Lineage
 

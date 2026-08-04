@@ -1,6 +1,7 @@
+import { Collapsible } from "@base-ui/react/collapsible";
 import { Popover } from "@base-ui/react/popover";
 import { Select } from "@base-ui/react/select";
-import { Check, ChevronDown, Info, Mic, Send } from "lucide-react";
+import { Check, ChevronDown, Info, LoaderCircle, Mic, Send } from "lucide-react";
 import { type FormEvent, useCallback, useEffect, useRef, useState } from "react";
 
 import { isVoiceFiller } from "@/lib/assistant-copy";
@@ -19,6 +20,7 @@ import {
 
 type Phase = "idle" | "connecting" | "listening" | "thinking" | "speaking" | "error";
 type TranscriptItem = TranscriptEntry & { id: number };
+type FreeQuestion = { key: string; question: string };
 
 type TurnDecision =
   | {
@@ -42,6 +44,119 @@ function statusLabel(phase: Phase, textOnly: boolean) {
   if (phase === "speaking") return "Speaking";
   if (phase === "error") return "Unavailable";
   return textOnly ? "Type a question" : "Listening";
+}
+
+function activityLabel(phase: Phase) {
+  if (phase === "connecting") return "Initializing conversation";
+  if (phase === "thinking") return "Thinking";
+  return null;
+}
+
+function FreeQuestionPicker({
+  disabled,
+  onSelect,
+  userTurnCount,
+}: {
+  disabled: boolean;
+  onSelect: (question: string) => void;
+  userTurnCount: number;
+}) {
+  const [open, setOpen] = useState(false);
+  const [questions, setQuestions] = useState<FreeQuestion[] | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState(false);
+  const autoOpenedRef = useRef(false);
+  const previousUserTurnCountRef = useRef(userTurnCount);
+
+  const loadQuestions = useCallback(async () => {
+    if (loading) return;
+    setLoading(true);
+    setLoadError(false);
+    try {
+      const response = await fetch("/api/assistant/faqs");
+      if (!response.ok) throw new Error("FAQ listing failed");
+      const result = (await response.json()) as { questions?: FreeQuestion[] };
+      setQuestions(result.questions ?? []);
+    } catch {
+      setLoadError(true);
+    } finally {
+      setLoading(false);
+    }
+  }, [loading]);
+
+  useEffect(() => {
+    if (disabled) {
+      autoOpenedRef.current = false;
+      setOpen(false);
+      return;
+    }
+    if (autoOpenedRef.current) return;
+    autoOpenedRef.current = true;
+    setOpen(true);
+    if (questions === null) void loadQuestions();
+  }, [disabled, loadQuestions, questions]);
+
+  useEffect(() => {
+    if (userTurnCount > previousUserTurnCountRef.current) setOpen(false);
+    previousUserTurnCountRef.current = userTurnCount;
+  }, [userTurnCount]);
+
+  return (
+    <Collapsible.Root
+      className="voice-free-questions"
+      open={open}
+      onOpenChange={(nextOpen) => {
+        setOpen(nextOpen);
+        if (nextOpen && questions === null && !loading) void loadQuestions();
+      }}
+    >
+      <Collapsible.Trigger className="voice-free-questions-trigger">
+        <span>
+          {userTurnCount === 0
+            ? "Start with a prepared question"
+            : "Browse prepared questions"}
+        </span>
+        <ChevronDown aria-hidden="true" />
+      </Collapsible.Trigger>
+      <Collapsible.Panel className="voice-free-questions-panel">
+        {loading ? (
+          <span className="voice-free-questions-loading">
+            <LoaderCircle aria-hidden="true" /> Loading questions
+          </span>
+        ) : loadError ? (
+          <button
+            type="button"
+            className="voice-free-questions-retry"
+            onClick={() => void loadQuestions()}
+          >
+            Could not load questions. Try again
+          </button>
+        ) : questions?.length ? (
+          <ul>
+            {questions.map((item) => (
+              <li key={item.key}>
+                <button
+                  type="button"
+                  className="voice-free-question-button"
+                  disabled={disabled}
+                  onClick={() => {
+                    setOpen(false);
+                    onSelect(item.question);
+                  }}
+                >
+                  {item.question}
+                </button>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <span className="voice-free-questions-empty">
+            No prepared questions available right now.
+          </span>
+        )}
+      </Collapsible.Panel>
+    </Collapsible.Root>
+  );
 }
 
 export function VoiceAssistant() {
@@ -143,7 +258,7 @@ export function VoiceAssistant() {
     idleTimerRef.current = window.setTimeout(stopConversation, IDLE_TIMEOUT_MS);
   }, [stopConversation]);
 
-  const appendTranscript = useCallback((entry: TranscriptEntry) => {
+  const appendTranscript = useCallback((entry: Omit<TranscriptItem, "id">) => {
     transcriptIdRef.current += 1;
     setTranscript((current) => [...current, { ...entry, id: transcriptIdRef.current }]);
   }, []);
@@ -547,22 +662,31 @@ export function VoiceAssistant() {
     ],
   );
 
+  const submitQuestion = useCallback(
+    (text: string) => {
+      if (!text.trim()) return;
+      const trimmed = text.trim();
+      interruptAssistant();
+      const accepted = send({
+        type: "conversation.item.create",
+        item: {
+          type: "message",
+          role: "user",
+          content: [{ type: "input_text", text: trimmed }],
+        },
+      });
+      if (!accepted) return;
+      setQuestion("");
+      void routeUserTurn(trimmed);
+    },
+    [interruptAssistant, routeUserTurn, send],
+  );
+
   const askQuestion = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const text = question.trim();
     if (!text) return;
-    interruptAssistant();
-    const accepted = send({
-      type: "conversation.item.create",
-      item: {
-        type: "message",
-        role: "user",
-        content: [{ type: "input_text", text }],
-      },
-    });
-    if (!accepted) return;
-    setQuestion("");
-    void routeUserTurn(text);
+    submitQuestion(text);
   };
 
   useEffect(() => releaseConnection, [releaseConnection]);
@@ -585,6 +709,8 @@ export function VoiceAssistant() {
   const active = phase !== "idle";
   const connected = channelRef.current?.readyState === "open";
   const selectedModelInfo = REALTIME_MODELS.find((option) => option.id === model);
+  const activeActivityLabel = activityLabel(phase);
+  const userTurnCount = transcript.filter((entry) => entry.role === "user").length;
 
   return (
     <div className={`voice-guide${active ? " is-active" : ""}`}>
@@ -700,43 +826,40 @@ export function VoiceAssistant() {
                       </Select.Portal>
                     </Select.Root>
                   </div>
-                ) : (
-                  <Popover.Root>
-                    <Popover.Trigger
-                      className="voice-quota-trigger"
-                      aria-label="Weekly AI answer allowance"
+                ) : null}
+                <Popover.Root>
+                  <Popover.Trigger
+                    className="voice-quota-trigger"
+                    aria-label="Weekly AI answer allowance"
+                  >
+                    <strong>{questionsRemaining ?? "–"}</strong>
+                    <span>
+                      {questionsRemaining === 1 ? "question" : "questions"} left
+                    </span>
+                    <Info aria-hidden="true" />
+                  </Popover.Trigger>
+                  <Popover.Portal>
+                    <Popover.Positioner
+                      className="voice-quota-positioner"
+                      sideOffset={8}
+                      align="end"
                     >
-                      <strong>{questionsRemaining ?? "–"}</strong>
-                      <span>
-                        {questionsRemaining === 1 ? "question" : "questions"} left
-                      </span>
-                      <Info aria-hidden="true" />
-                    </Popover.Trigger>
-                    <Popover.Portal>
-                      <Popover.Positioner
-                        className="voice-quota-positioner"
-                        sideOffset={8}
-                        align="end"
-                      >
-                        <Popover.Popup className="voice-quota-popup">
-                          <Popover.Title className="voice-quota-title">
-                            How Free answers work
-                          </Popover.Title>
-                          <Popover.Description className="voice-quota-description">
-                            Each visitor gets 10 live AI answers every seven days. A Free
-                            tag means your question matched a verified answer and voice
-                            prepared in advance, so no new spoken answer had to be
-                            generated and your quota stays unchanged. The answer still
-                            joins the conversation, so follow-up questions keep their
-                            context. Other questions use live AI and reduce your
-                            allowance. This hybrid approach keeps the assistant fast,
-                            consistent, and affordable.
-                          </Popover.Description>
-                        </Popover.Popup>
-                      </Popover.Positioner>
-                    </Popover.Portal>
-                  </Popover.Root>
-                )}
+                      <Popover.Popup className="voice-quota-popup">
+                        <Popover.Title className="voice-quota-title">
+                          Experimental usage limit
+                        </Popover.Title>
+                        <Popover.Description className="voice-quota-description">
+                          During this experimental phase, each visitor can ask up to 10
+                          questions per week that need a new AI answer. This keeps costs
+                          predictable. Prepared questions do not count toward this quota.
+                          Ask them in your own words and, when matched, the answer shows a
+                          Prepared label—or choose one from Browse prepared questions at
+                          the bottom of the chat.
+                        </Popover.Description>
+                      </Popover.Popup>
+                    </Popover.Positioner>
+                  </Popover.Portal>
+                </Popover.Root>
                 <button
                   type="button"
                   className="voice-end-button"
@@ -756,11 +879,9 @@ export function VoiceAssistant() {
               {transcript.length === 0 &&
               !assistantDraft &&
               !error &&
-              (phase === "connecting" || phase === "listening") ? (
+              phase === "listening" ? (
                 <p className="voice-placeholder">
-                  {phase === "connecting"
-                    ? "Opening a secure voice session…"
-                    : "Ask about Anthony's work, projects, or experience."}
+                  Ask about Anthony's work, projects, or experience.
                 </p>
               ) : null}
               {transcript.map((entry) => (
@@ -771,9 +892,9 @@ export function VoiceAssistant() {
                     {entry.source === "faq" ? (
                       <small
                         className="voice-message-badge"
-                        title="Cached FAQ answer — no quota used"
+                        title="Prepared answer — no quota used"
                       >
-                        Free
+                        Prepared
                       </small>
                     ) : null}
                     {import.meta.env.DEV && entry.matchedBy === "semantic" ? (
@@ -799,15 +920,10 @@ export function VoiceAssistant() {
                   <p>{assistantDraft}</p>
                 </div>
               ) : null}
-              {phase === "thinking" && !assistantDraft && !error ? (
-                <div
-                  className="voice-thinking"
-                  role="status"
-                  aria-label="Assistant is thinking"
-                >
-                  <i />
-                  <i />
-                  <i />
+              {activeActivityLabel && !assistantDraft && !error ? (
+                <div className="voice-activity-marker" role="status">
+                  <LoaderCircle aria-hidden="true" />
+                  <span>{activeActivityLabel}</span>
                 </div>
               ) : null}
               {notice ? <p className="voice-notice">{notice}</p> : null}
@@ -824,28 +940,35 @@ export function VoiceAssistant() {
                 </button>
               </div>
             ) : (
-              <form className="voice-question" onSubmit={askQuestion}>
-                <label htmlFor="voice-question">Type instead</label>
-                <div>
-                  <input
-                    id="voice-question"
-                    value={question}
-                    onChange={(event) => setQuestion(event.target.value)}
-                    placeholder={
-                      phase === "connecting" ? "Connecting…" : "Ask a question"
-                    }
-                    maxLength={500}
-                    disabled={!connected}
-                  />
-                  <button
-                    type="submit"
-                    disabled={!connected || !question.trim()}
-                    aria-label="Send question"
-                  >
-                    <Send aria-hidden="true" />
-                  </button>
-                </div>
-              </form>
+              <div className="voice-panel-footer">
+                <FreeQuestionPicker
+                  disabled={!connected}
+                  onSelect={submitQuestion}
+                  userTurnCount={userTurnCount}
+                />
+                <form className="voice-question" onSubmit={askQuestion}>
+                  <label htmlFor="voice-question">Type instead</label>
+                  <div>
+                    <input
+                      id="voice-question"
+                      value={question}
+                      onChange={(event) => setQuestion(event.target.value)}
+                      placeholder={
+                        phase === "connecting" ? "Connecting…" : "Ask a question"
+                      }
+                      maxLength={500}
+                      disabled={!connected}
+                    />
+                    <button
+                      type="submit"
+                      disabled={!connected || !question.trim()}
+                      aria-label="Send question"
+                    >
+                      <Send aria-hidden="true" />
+                    </button>
+                  </div>
+                </form>
+              </div>
             )}
           </section>
         </>

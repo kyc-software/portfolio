@@ -16,6 +16,7 @@ const QUOTA_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 const SEEDED_FAQS = [
   {
     key: "greeting",
+    question: "",
     answer: INITIAL_GREETING,
     aliases: [] as string[],
     intent: "",
@@ -23,6 +24,7 @@ const SEEDED_FAQS = [
   },
   {
     key: "who-are-you",
+    question: "Who are you?",
     answer: WHO_ARE_YOU_ANSWER,
     aliases: [...WHO_ARE_YOU_ALIASES],
     intent: "Questions asking the AI assistant to identify itself or explain its role.",
@@ -30,6 +32,7 @@ const SEEDED_FAQS = [
   },
   {
     key: "profile-overview",
+    question: "What does Anthony do?",
     answer:
       "Anthony is a senior software engineer and product builder with over ten years of experience. He has also worked as an agile coach and engineering leader.",
     aliases: [
@@ -59,6 +62,7 @@ const SEEDED_FAQS = [
   },
   {
     key: "nextjs-experience",
+    question: "Has Anthony worked with Next.js?",
     answer:
       "Yes. Anthony has used Next.js across several products, including Bisonflow, Pixlr, and earlier project management platforms.",
     aliases: [
@@ -78,6 +82,7 @@ const SEEDED_FAQS = [
   },
   {
     key: "latest-projects",
+    question: "What are Anthony's latest projects?",
     answer:
       "Anthony's latest projects include this portfolio, Bragi Notes, Tingshuo, Loany, and a Biotech concept prototype. Which one would you like to explore?",
     aliases: [
@@ -111,6 +116,7 @@ const SEEDED_FAQS = [
   },
   {
     key: "location",
+    question: "Where is Anthony based?",
     answer:
       "Anthony is currently based in Taiwan and works remotely. His earlier career includes several roles in France.",
     aliases: [
@@ -129,6 +135,7 @@ const SEEDED_FAQS = [
   },
   {
     key: "working-style",
+    question: "What is Anthony's working style?",
     answer:
       "Anthony works with high ownership and prefers durable, simple solutions. He moves comfortably between product decisions, architecture, implementation, and team coaching.",
     aliases: [
@@ -221,7 +228,8 @@ export const initialize = internalMutation({
         });
       }
 
-      if (existing && seed.intent) {
+      if (existing) {
+        const questionChanged = existing.question !== seed.question;
         const aliasesChanged =
           JSON.stringify(existing.aliases) !== JSON.stringify(seed.aliases);
         const intentChanged = existing.intent !== seed.intent;
@@ -229,10 +237,18 @@ export const initialize = internalMutation({
           JSON.stringify(existing.matchSignals ?? []) !==
           JSON.stringify(seed.matchSignals);
         const needsEmbedding =
-          intentChanged || !existing.embedding || existing.embeddingStatus === "failed";
+          Boolean(seed.intent) &&
+          (intentChanged || !existing.embedding || existing.embeddingStatus === "failed");
 
-        if (aliasesChanged || intentChanged || signalsChanged || needsEmbedding) {
+        if (
+          questionChanged ||
+          aliasesChanged ||
+          intentChanged ||
+          signalsChanged ||
+          needsEmbedding
+        ) {
           await ctx.db.patch(existing._id, {
+            question: seed.question,
             aliases: [...seed.aliases],
             intent: seed.intent,
             matchSignals: [...seed.matchSignals],
@@ -242,7 +258,11 @@ export const initialize = internalMutation({
             updatedAt: now,
           });
         }
-        if (needsEmbedding && (intentChanged || existing.embeddingStatus !== "pending"))
+        if (
+          seed.intent &&
+          needsEmbedding &&
+          (intentChanged || existing.embeddingStatus !== "pending")
+        )
           await ctx.scheduler.runAfter(0, internal.assistant.generateFaqEmbedding, {
             faqId: existing._id,
           });
@@ -269,6 +289,20 @@ export const initialize = internalMutation({
 export const faqsForMatching = internalQuery({
   args: {},
   handler: (ctx) => ctx.db.query("faqs").collect(),
+});
+
+export const freeQuestions = internalQuery({
+  args: {},
+  handler: async (ctx) =>
+    (await ctx.db.query("faqs").collect())
+      .filter(
+        (faq) =>
+          faq.key !== "greeting" &&
+          Boolean(faq.question) &&
+          faq.audioStatus === "ready" &&
+          Boolean(faq.audioStorageId),
+      )
+      .map(({ key, question }) => ({ key, question: question ?? "" })),
 });
 
 export const updateQuota = internalMutation({

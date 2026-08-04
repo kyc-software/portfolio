@@ -11,6 +11,7 @@ export default defineSchema({
 
   faqs: defineTable({
     key: v.string(),
+    question: v.optional(v.string()),
     answer: v.string(),
     aliases: v.array(v.string()),
     intent: v.optional(v.string()),

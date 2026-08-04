@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './app/__root'
 import { Route as IndexRouteImport } from './app/index'
 import { Route as ApiAssistantCandidateRouteImport } from './app/api.assistant.candidate'
+import { Route as ApiAssistantFaqsRouteImport } from './app/api.assistant.faqs'
 import { Route as ApiAssistantTurnRouteImport } from './app/api.assistant.turn'
 import { Route as ApiRealtimeSessionRouteImport } from './app/api.realtime.session'
 
@@ -22,6 +23,11 @@ const IndexRoute = IndexRouteImport.update({
 const ApiAssistantCandidateRoute = ApiAssistantCandidateRouteImport.update({
   id: '/api/assistant/candidate',
   path: '/api/assistant/candidate',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAssistantFaqsRoute = ApiAssistantFaqsRouteImport.update({
+  id: '/api/assistant/faqs',
+  path: '/api/assistant/faqs',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiAssistantTurnRoute = ApiAssistantTurnRouteImport.update({
@@ -38,12 +44,14 @@ const ApiRealtimeSessionRoute = ApiRealtimeSessionRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/api/assistant/candidate': typeof ApiAssistantCandidateRoute
+  '/api/assistant/faqs': typeof ApiAssistantFaqsRoute
   '/api/assistant/turn': typeof ApiAssistantTurnRoute
   '/api/realtime/session': typeof ApiRealtimeSessionRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/api/assistant/candidate': typeof ApiAssistantCandidateRoute
+  '/api/assistant/faqs': typeof ApiAssistantFaqsRoute
   '/api/assistant/turn': typeof ApiAssistantTurnRoute
   '/api/realtime/session': typeof ApiRealtimeSessionRoute
 }
@@ -51,6 +59,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/api/assistant/candidate': typeof ApiAssistantCandidateRoute
+  '/api/assistant/faqs': typeof ApiAssistantFaqsRoute
   '/api/assistant/turn': typeof ApiAssistantTurnRoute
   '/api/realtime/session': typeof ApiRealtimeSessionRoute
 }
@@ -59,18 +68,21 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/api/assistant/candidate'
+    | '/api/assistant/faqs'
     | '/api/assistant/turn'
     | '/api/realtime/session'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/api/assistant/candidate'
+    | '/api/assistant/faqs'
     | '/api/assistant/turn'
     | '/api/realtime/session'
   id:
     | '__root__'
     | '/'
     | '/api/assistant/candidate'
+    | '/api/assistant/faqs'
     | '/api/assistant/turn'
     | '/api/realtime/session'
   fileRoutesById: FileRoutesById
@@ -78,6 +90,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ApiAssistantCandidateRoute: typeof ApiAssistantCandidateRoute
+  ApiAssistantFaqsRoute: typeof ApiAssistantFaqsRoute
   ApiAssistantTurnRoute: typeof ApiAssistantTurnRoute
   ApiRealtimeSessionRoute: typeof ApiRealtimeSessionRoute
 }
@@ -96,6 +109,13 @@ declare module '@tanstack/react-router' {
       path: '/api/assistant/candidate'
       fullPath: '/api/assistant/candidate'
       preLoaderRoute: typeof ApiAssistantCandidateRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/assistant/faqs': {
+      id: '/api/assistant/faqs'
+      path: '/api/assistant/faqs'
+      fullPath: '/api/assistant/faqs'
+      preLoaderRoute: typeof ApiAssistantFaqsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/assistant/turn': {
@@ -118,6 +138,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ApiAssistantCandidateRoute: ApiAssistantCandidateRoute,
+  ApiAssistantFaqsRoute: ApiAssistantFaqsRoute,
   ApiAssistantTurnRoute: ApiAssistantTurnRoute,
   ApiRealtimeSessionRoute: ApiRealtimeSessionRoute,
 }

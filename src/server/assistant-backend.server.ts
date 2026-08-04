@@ -14,6 +14,8 @@ export type AssistantTurn =
   | { kind: "realtime"; remaining: number }
   | { kind: "limited"; remaining: 0 };
 
+export type FreeQuestion = { key: string; question: string };
+
 function visitorCookie(request: Request) {
   const cookies = request.headers.get("cookie")?.split(";") ?? [];
   for (const cookie of cookies) {
@@ -107,6 +109,20 @@ export async function recordAssistantCandidate(question: string, answer: string)
       "Convex candidate logging unavailable in development",
       error instanceof Error ? error.message : "Error",
     );
+  }
+}
+
+export async function listFreeQuestions() {
+  try {
+    const result = await callConvex<{ questions: FreeQuestion[] }>("/assistant/faqs", {});
+    return result.questions;
+  } catch (error) {
+    if (!import.meta.env.DEV) throw error;
+    console.warn(
+      "Convex FAQ listing unavailable in development",
+      error instanceof Error ? error.message : "Error",
+    );
+    return [];
   }
 }
 

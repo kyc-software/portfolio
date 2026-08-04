@@ -46,6 +46,8 @@ flowchart LR
 - Convex action generates MP3 once and stores resulting blob.
 - Browser inserts cached assistant text into Realtime conversation before local
   audio playback, preserving follow-up context.
+- Persistent chat-footer picker stays visible but fetches prepared questions only
+  when visitor expands it. Convex returns only searchable FAQs with ready audio.
 
 ## Session sequence
 
@@ -109,9 +111,36 @@ sequenceDiagram
     Portfolio->>Convex: Upsert candidate occurrence
   else Quota exhausted
     Convex-->>Browser: No generation allowed
-    Browser->>Browser: Show local limit message
+    Browser->>Browser: Show local limit message; prepared picker remains usable
   end
 ```
+
+## Prepared-question discovery
+
+```mermaid
+sequenceDiagram
+  actor Visitor
+  participant Browser
+  participant Portfolio as Portfolio server
+  participant Convex
+
+  Browser->>Browser: Ready session auto-opens picker beside greeting
+  Browser->>Portfolio: GET prepared questions
+  Portfolio->>Convex: Authorized FAQ-list request
+  Convex->>Convex: Keep non-greeting FAQs with ready stored audio
+  Convex-->>Portfolio: Canonical question labels
+  Portfolio-->>Browser: Private short-lived response
+  Browser->>Browser: Render clickable list
+  Visitor->>Browser: Select question
+  Browser->>Browser: Run normal turn pipeline
+```
+
+Question labels are curated seed data and reconcile during initialization. Ready
+session auto-opens and fetches picker once; first user turn collapses it, with manual
+reopening always available. List is session-cached in component and HTTP response
+may be privately cached for five minutes. UI accepts arbitrary catalog size;
+expanded panel is height-capped and independently scrollable so 50+ entries
+preserve visible transcript space.
 
 ## Quota
 
@@ -135,8 +164,9 @@ Seed data is idempotent. First successful Convex initialization creates missing
 FAQ rows and schedules audio plus intent-embedding generation. `pending`, `ready`,
 and `failed` state prevents duplicate generation and permits retry after failure.
 Changing curated intent text invalidates and regenerates its embedding.
-Curated aliases and intent signals reconcile on initialization, so pronoun and
-nickname coverage updates without replacing stored audio.
+Curated question labels, aliases, and intent signals reconcile on initialization,
+so discovery copy plus pronoun and nickname coverage update without replacing
+stored audio.
 
 Audio files are immutable Convex storage objects. FAQ rows keep storage ID;
 request-time lookup resolves current URL. Version-one seed answers are code-owned;
@@ -183,4 +213,6 @@ browser response control removed, or a server-owned Realtime connection.
    stored intent vectors.
 4. Confident semantic matches reuse verified text and MP3 without spending quota.
 5. Ambiguous or unmatched questions atomically reserve quota and use Realtime.
-6. Development marks semantic hits beside Free; production shows only Free.
+6. Development marks semantic hits beside Prepared; production shows only Prepared.
+7. Persistent lazy picker gives visitors direct access to every ready cached answer,
+   including after live-answer quota is exhausted.

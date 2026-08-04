@@ -86,9 +86,16 @@ const candidate = httpAction(async (ctx, request) => {
   return new Response(null, { status: 204 });
 });
 
+const faqs = httpAction(async (ctx, request) => {
+  if (!authorized(request)) return json({ error: "Unauthorized" }, 401);
+  const questions = await ctx.runQuery(internal.assistant.freeQuestions, {});
+  return json({ questions });
+});
+
 const http = httpRouter();
 http.route({ path: "/assistant/initialize", method: "POST", handler: initialize });
 http.route({ path: "/assistant/turn", method: "POST", handler: turn });
 http.route({ path: "/assistant/candidate", method: "POST", handler: candidate });
+http.route({ path: "/assistant/faqs", method: "POST", handler: faqs });
 
 export default http;

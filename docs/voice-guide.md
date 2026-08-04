@@ -4,8 +4,9 @@
 
 Landing-page assistant answers from Anthony's curated Markdown profile. OpenAI
 Realtime handles live speech over WebRTC. Convex owns anonymous weekly quota,
-exact and semantic FAQ routing, reusable audio, and cache-candidate analytics. Browser never
-receives OpenAI keys or Convex bridge secret.
+exact and semantic FAQ routing, reusable audio, prepared-question discovery, and
+cache-candidate analytics. Browser never receives OpenAI keys or Convex bridge
+secret.
 
 Detailed diagrams and trust boundaries: [voice-cache-architecture.md](voice-cache-architecture.md).
 
@@ -69,9 +70,10 @@ bunx convex env set OPENAI_API_KEY <your-key>
 bun run dev
 ```
 
-Development keeps model picker. Production replaces it with remaining-question
-counter and Base UI explanation popover. Development cached answers show Free;
-semantic cache hits additionally show Semantic for routing verification.
+Both environments show remaining-question counter and Base UI explanation popover.
+Development additionally shows model picker immediately left of quota. Prepared
+answers show Prepared; development semantic hits additionally show Semantic for
+routing verification.
 
 ## Runtime behavior
 
@@ -87,6 +89,13 @@ semantic cache hits additionally show Semantic for routing verification.
   use exact aliases; freer phrasings continue through semantic matching.
 - Seven cached topics cover greeting, identity, profile overview, Next.js experience,
   latest projects, location, and working style.
+- Chat footer always exposes a Base UI prepared-question collapsible. Its six
+  searchable questions load when the ready session auto-opens it beside greeting
+  and only include FAQs whose stored audio is ready. First user turn collapses it;
+  visitor can reopen it anytime. Selecting one follows same turn pipeline and never
+  spends live-answer quota. Expanded results are capped below half chat height and
+  scroll independently, so future 50+ question catalogs cannot hide conversation
+  history.
 - Stored MP3 plays locally while cached assistant text enters same Realtime history,
   preserving follow-up context.
 - Missing MP3 falls back to exact Realtime speech, so feature remains usable during
@@ -94,8 +103,9 @@ semantic cache hits additionally show Semantic for routing verification.
 - Cache misses reserve one credit atomically, use Realtime, then upsert question and
   answer into `candidates` for later FAQ review. Candidates never auto-promote.
 - Common microphone fillers are ignored without spending quota.
-- Input transcription deltas render while the visitor speaks. Speech end shows
-  the thinking indicator through FAQ routing or Realtime generation.
+- Input transcription deltas render while visitor speaks. Inline status markers
+  label conversation initialization and thinking without adding fake message
+  bubbles.
 - Full transcript remains scrollable until the conversation ends; no messages
   are discarded during an active session.
 - Production fails closed when Convex is unavailable or misconfigured.
@@ -112,6 +122,7 @@ semantic cache hits additionally show Semantic for routing verification.
 - `convex/http.ts`: shared-secret HTTP bridge.
 - `src/server/assistant-backend.server.ts`: cookie and Convex client boundary.
 - `src/app/api.assistant.turn.ts`: browser cache/quota route.
+- `src/app/api.assistant.faqs.ts`: lazy prepared-question listing route.
 - `src/app/api.assistant.candidate.ts`: completed miss logging.
 - `src/server/realtime-session.server.ts`: prompt, validation, OpenAI handshake.
 - `src/components/voice-assistant.tsx`: WebRTC, cache playback, context injection,
@@ -154,3 +165,4 @@ require Convex `OPENAI_API_KEY`.
 - [Convex HTTP actions](https://docs.convex.dev/functions/http-actions)
 - [Convex file storage](https://docs.convex.dev/file-storage/store-files)
 - [Convex scheduled functions](https://docs.convex.dev/scheduling/scheduled-functions)
+- [Base UI Collapsible](https://base-ui.com/react/components/collapsible)
