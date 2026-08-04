@@ -936,12 +936,10 @@ export function VoiceAssistant() {
                           Experimental usage limit
                         </Popover.Title>
                         <Popover.Description className="voice-quota-description">
-                          During this experimental phase, each visitor can ask up to 20
-                          questions per week that need a new AI answer. This keeps costs
-                          predictable. Prepared questions do not count toward this quota.
-                          Ask them in your own words and, when matched, the answer shows a
-                          Prepared label—or choose one from Browse prepared questions at
-                          the bottom of the chat.
+                          You can ask up to 20 questions per week that need a new AI
+                          answer. "Prepared" questions does not reduce your remaining
+                          quota. Ask them in your own words or choose one from the list of
+                          "prepared" questions below.
                         </Popover.Description>
                       </Popover.Popup>
                     </Popover.Positioner>
