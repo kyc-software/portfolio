@@ -234,6 +234,8 @@ Designed and built this portfolio as a high-performance, static-first product ex
 - Designed the visual system, motion, lazy project previews, content architecture, metadata, security headers, and deployment setup.
 - Built a profile-grounded OpenAI Realtime voice assistant using browser WebRTC, short-lived server-created sessions, fresh context per conversation, live transcripts, interruption handling, strict topic scope, and server-only credentials.
 - Designed a cost-aware hybrid answer pipeline with Convex: exact FAQ matching, guarded semantic intent matching with OpenAI embeddings, anonymous weekly quotas, atomic usage accounting, reusable OpenAI speech audio in file storage, and cache-candidate analytics.
+- Prepared and deployed a versioned production catalog of 50 profile questions with verified concise answers, 51 reusable speech files including the greeting, and compact 512-dimension embeddings; added readiness checks and deployment-only reconciliation so visitor startup stays lean.
+- Reduced semantic routing transfer from roughly 510 KB of FAQ data to about 25 KB of metadata plus only eligible vectors, while skipping embedding spend after quota exhaustion.
 - Added transparent Prepared and development-only Semantic routing labels, a lazy and scalable Base UI prepared-question picker with bounded scrolling, concise spoken answers, labeled initialization/thinking states, and responsive full-screen mobile conversation UX.
 
 ### DAKA / Renwu / DAKA Labs - Project Management SaaS Lineage

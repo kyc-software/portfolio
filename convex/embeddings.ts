@@ -1,3 +1,6 @@
+export const EMBEDDING_DIMENSIONS = 512;
+export const EMBEDDING_VERSION = `text-embedding-3-small:${EMBEDDING_DIMENSIONS}:v1`;
+
 const EMBEDDING_MODEL = "text-embedding-3-small";
 
 export async function createEmbedding(input: string) {
@@ -14,6 +17,7 @@ export async function createEmbedding(input: string) {
       model: EMBEDDING_MODEL,
       input,
       encoding_format: "float",
+      dimensions: EMBEDDING_DIMENSIONS,
     }),
   });
   if (!response.ok) throw new Error(`Embedding generation failed: ${response.status}`);

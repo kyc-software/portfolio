@@ -1,6 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { cosineSimilarity } from "../convex/embeddings.ts";
+import {
+  cosineSimilarity,
+  EMBEDDING_DIMENSIONS,
+  EMBEDDING_VERSION,
+} from "../convex/embeddings.ts";
+import { PREPARED_QUESTION_COUNT, SEEDED_FAQS } from "../convex/faqCatalog.ts";
 import { hasPortfolioReferent, hasSemanticSignal } from "../convex/routing.ts";
 import {
   isVoiceFiller,
@@ -127,6 +132,30 @@ test("compares embeddings with cosine similarity", () => {
   assert.equal(cosineSimilarity([1, 0], [1, 0]), 1);
   assert.equal(cosineSimilarity([1, 0], [0, 1]), 0);
   assert.equal(cosineSimilarity([1], [1, 0]), -1);
+});
+
+test("ships exactly 50 complete, unique prepared FAQs", () => {
+  const prepared = SEEDED_FAQS.filter(({ key }) => key !== "greeting");
+  assert.equal(PREPARED_QUESTION_COUNT, 50);
+  assert.equal(prepared.length, 50);
+  assert.equal(new Set(SEEDED_FAQS.map(({ key }) => key)).size, 51);
+  assert.equal(new Set(prepared.map(({ question }) => question)).size, 50);
+  assert.equal(
+    prepared.every(
+      ({ question, answer, aliases, intent, matchSignals }) =>
+        question.length > 0 &&
+        answer.length > 0 &&
+        aliases.includes(normalizeAssistantQuestion(question)) &&
+        intent.length > 0 &&
+        matchSignals.length > 0,
+    ),
+    true,
+  );
+});
+
+test("uses compact versioned FAQ embeddings", () => {
+  assert.equal(EMBEDDING_DIMENSIONS, 512);
+  assert.equal(EMBEDDING_VERSION, "text-embedding-3-small:512:v1");
 });
 
 test("requires portfolio subject and FAQ intent signals", () => {

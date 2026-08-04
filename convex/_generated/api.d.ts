@@ -10,6 +10,7 @@
 
 import type * as assistant from "../assistant.js";
 import type * as embeddings from "../embeddings.js";
+import type * as faqCatalog from "../faqCatalog.js";
 import type * as http from "../http.js";
 import type * as routing from "../routing.js";
 
@@ -22,6 +23,7 @@ import type {
 declare const fullApi: ApiFromModules<{
   assistant: typeof assistant;
   embeddings: typeof embeddings;
+  faqCatalog: typeof faqCatalog;
   http: typeof http;
   routing: typeof routing;
 }>;

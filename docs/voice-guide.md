@@ -9,6 +9,7 @@ cache-candidate analytics. Browser never receives OpenAI keys or Convex bridge
 secret.
 
 Detailed diagrams and trust boundaries: [voice-cache-architecture.md](voice-cache-architecture.md).
+Production findings and readiness: [voice-production-audit.md](voice-production-audit.md).
 
 ## Production setup
 
@@ -41,10 +42,16 @@ Do not prefix secrets with `VITE_`; Vite-prefixed values can become public.
 Realtime sessions while Convex creates reusable Speech API audio and FAQ/query
 embeddings.
 
-After setting Convex variables, start one conversation. Idempotent initialization
-seeds seven FAQ records and schedules seven MP3 files. Failed generation retries on
-next initialization. Check `faqs` table for `audioStatus: "ready"` and populated
-`audioStorageId`.
+After deploying catalog changes, provision production explicitly:
+
+```bash
+bunx convex run --prod assistant:provisionCatalog '{"force":false}'
+bunx convex run --prod assistant:catalogStatus '{}'
+```
+
+Ready production status is 51 records and audio files, 50 prepared questions, 50
+embeddings, and zero failures. Explicit provisioning keeps catalog work out of every
+visitor session and leaves development data unchanged.
 
 Deploy later Convex changes with:
 
@@ -83,13 +90,15 @@ routing verification.
   semantic intent. Cached answers cost no live-answer quota.
 - Semantic routing uses `text-embedding-3-small`, one stored vector per FAQ,
   direct cosine comparison, a portfolio-subject gate, intent signals, confidence
-  threshold, and runner-up margin. This avoids vector-database overhead for six
-  searchable intents and rejects unrelated or ambiguous questions.
+  threshold, and runner-up margin. Lightweight metadata is loaded first; only
+  signal-eligible vectors cross into semantic routing. This avoids vector-database
+  overhead for 50 bounded intents and rejects unrelated or ambiguous questions.
 - `Tony`, `he`, `him`, and `his` are treated as Anthony. Common pronoun questions
   use exact aliases; freer phrasings continue through semantic matching.
-- Seven cached topics cover greeting, identity, profile overview, Next.js experience,
-  latest projects, location, and working style.
-- Chat footer always exposes a Base UI prepared-question collapsible. Its six
+- Fifty prepared topics cover profile, skills, projects, leadership, location,
+  availability, education, and contact. See
+  [prepared-questions.md](prepared-questions.md).
+- Chat footer always exposes a Base UI prepared-question collapsible. Its 50
   searchable questions load when the ready session auto-opens it beside greeting
   and only include FAQs whose stored audio is ready. First user turn collapses it;
   visitor can reopen it anytime. Selecting one follows same turn pipeline and never
@@ -115,7 +124,8 @@ routing verification.
 ## Main parts
 
 - `convex/schema.ts`: visitors, FAQs, candidates.
-- `convex/assistant.ts`: seed, atomic quota, candidate upsert, Speech and stored
+- `convex/faqCatalog.ts`: versioned production questions, answers, aliases, and signals.
+- `convex/assistant.ts`: provisioning, readiness, atomic quota, candidate upsert, Speech and stored
   intent-embedding generation.
 - `convex/embeddings.ts`: official Embeddings API call and cosine similarity.
 - `convex/routing.ts`: exact/semantic/Realtime decision pipeline.
@@ -151,9 +161,10 @@ bun run verify
 
 Automated tests cover FAQ normalization, semantic guards, cosine comparison, filler
 filtering, Realtime events, session limiting, type safety, formatting, and production
-build. Convex bridge validation additionally confirms exact and semantic hits keep
-quota while near misses reserve one credit. Live audio and embedding generation
-require Convex `OPENAI_API_KEY`.
+build. Catalog tests enforce exactly 50 unique and complete prepared questions.
+Production status confirms all audio and embeddings exist; routing probes confirm
+exact and semantic hits preserve quota. Live generation requires Convex
+`OPENAI_API_KEY`.
 
 ## Official references
 

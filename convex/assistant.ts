@@ -1,174 +1,156 @@
 import { v } from "convex/values";
 
-import {
-  INITIAL_GREETING,
-  normalizeAssistantQuestion,
-  WHO_ARE_YOU_ALIASES,
-  WHO_ARE_YOU_ANSWER,
-} from "../src/lib/assistant-copy";
+import { normalizeAssistantQuestion } from "../src/lib/assistant-copy";
 import { internal } from "./_generated/api";
-import { internalAction, internalMutation, internalQuery } from "./_generated/server";
-import { createEmbedding } from "./embeddings";
+import {
+  internalAction,
+  internalMutation,
+  internalQuery,
+  type MutationCtx,
+} from "./_generated/server";
+import { createEmbedding, EMBEDDING_VERSION } from "./embeddings";
+import { FAQ_CATALOG_VERSION, PREPARED_QUESTION_COUNT, SEEDED_FAQS } from "./faqCatalog";
 
 const QUESTION_LIMIT = 10;
 const QUOTA_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 
-const SEEDED_FAQS = [
-  {
-    key: "greeting",
-    question: "",
-    answer: INITIAL_GREETING,
-    aliases: [] as string[],
-    intent: "",
-    matchSignals: [] as string[],
-  },
-  {
-    key: "who-are-you",
-    question: "Who are you?",
-    answer: WHO_ARE_YOU_ANSWER,
-    aliases: [...WHO_ARE_YOU_ALIASES],
-    intent: "Questions asking the AI assistant to identify itself or explain its role.",
-    matchSignals: ["identify yourself", "yourself", "your role", "assistant"],
-  },
-  {
-    key: "profile-overview",
-    question: "What does Anthony do?",
-    answer:
-      "Anthony is a senior software engineer and product builder with over ten years of experience. He has also worked as an agile coach and engineering leader.",
-    aliases: [
-      "what does anthony do",
-      "what is anthony s background",
-      "tell me about anthony",
-      "describe anthony",
-      "what is anthony s profile",
-      "what does he do",
-      "what is his background",
-      "tell me about him",
-      "describe him",
-      "what is his profile",
-    ],
-    intent:
-      "Questions asking for an overview of Anthony's professional profile, background, career, or what he does.",
-    matchSignals: [
-      "profile",
-      "background",
-      "career",
-      "professional",
-      "what does anthony do",
-      "what does tony do",
-      "tell me about anthony",
-      "describe anthony",
-    ],
-  },
-  {
-    key: "nextjs-experience",
-    question: "Has Anthony worked with Next.js?",
-    answer:
-      "Yes. Anthony has used Next.js across several products, including Bisonflow, Pixlr, and earlier project management platforms.",
-    aliases: [
-      "does anthony know next js",
-      "has anthony worked with next js",
-      "does anthony have next js experience",
-      "what is anthony s experience with next js",
-      "has tony worked with next js",
-      "does he know next js",
-      "has he worked with next js",
-      "does he have next js experience",
-      "what is his experience with next js",
-    ],
-    intent:
-      "Questions asking whether Anthony or Tony has experience using Next.js or the Next framework.",
-    matchSignals: ["next js", "nextjs", "next framework"],
-  },
-  {
-    key: "latest-projects",
-    question: "What are Anthony's latest projects?",
-    answer:
-      "Anthony's latest projects include this portfolio, Bragi Notes, Tingshuo, Loany, and a Biotech concept prototype. Which one would you like to explore?",
-    aliases: [
-      "what are anthony s latest projects",
-      "what recent projects has anthony worked on",
-      "tell me about anthony s latest projects",
-      "what has anthony built recently",
-      "what are tony s latest projects",
-      "what are his latest projects",
-      "what recent projects has he worked on",
-      "tell me about his latest projects",
-      "what has he built recently",
-    ],
-    intent:
-      "Questions asking about Anthony's latest, newest, current, or recent projects, products, work, or things he has built.",
-    matchSignals: [
-      "latest project",
-      "latest projects",
-      "latest work",
-      "recent project",
-      "recent projects",
-      "recent work",
-      "newest project",
-      "current project",
-      "building lately",
-      "built lately",
-      "working on lately",
-      "built recently",
-      "shipped recently",
-    ],
-  },
-  {
-    key: "location",
-    question: "Where is Anthony based?",
-    answer:
-      "Anthony is currently based in Taiwan and works remotely. His earlier career includes several roles in France.",
-    aliases: [
-      "where is anthony based",
-      "where does anthony live",
-      "is anthony based in taiwan",
-      "is anthony in france",
-      "where is tony based",
-      "where is he based",
-      "where does he live",
-      "is he based in taiwan",
-      "is he in france",
-    ],
-    intent: "Questions asking where Anthony lives, is based, is located, or works from.",
-    matchSignals: ["where", "based", "live", "living", "located", "location"],
-  },
-  {
-    key: "working-style",
-    question: "What is Anthony's working style?",
-    answer:
-      "Anthony works with high ownership and prefers durable, simple solutions. He moves comfortably between product decisions, architecture, implementation, and team coaching.",
-    aliases: [
-      "how does anthony work",
-      "what is anthony s working style",
-      "describe anthony s working style",
-      "how does tony work",
-      "what is it like to work with anthony",
-      "how does he work",
-      "what is his working style",
-      "what is his work style",
-      "what is it like to work with him",
-    ],
-    intent:
-      "Questions asking about Anthony's working style, approach, collaboration, ownership, or what he is like to work with.",
-    matchSignals: [
-      "working style",
-      "work style",
-      "does he work",
-      "how he works",
-      "work with",
-      "colleague",
-      "collaborate",
-      "collaboration",
-      "approach",
-      "ownership",
-    ],
-  },
-] as const;
+const CATALOG_CONFIG_KEY = "faqCatalogVersion";
+const GENERATION_STAGGER_MS = 200;
 
 function remaining(used: number) {
   return Math.max(0, QUESTION_LIMIT - used);
 }
+
+async function reconcileCatalog(ctx: MutationCtx, force: boolean) {
+  const now = Date.now();
+  let audioScheduled = 0;
+  let embeddingsScheduled = 0;
+
+  for (const [index, seed] of SEEDED_FAQS.entries()) {
+    const existing = await ctx.db
+      .query("faqs")
+      .withIndex("by_key", (query) => query.eq("key", seed.key))
+      .unique();
+    const delay = index * GENERATION_STAGGER_MS;
+
+    if (!existing) {
+      const faqId = await ctx.db.insert("faqs", {
+        ...seed,
+        sortOrder: index,
+        aliases: [...seed.aliases],
+        matchSignals: [...seed.matchSignals],
+        audioStatus: "pending",
+        ...(seed.intent
+          ? {
+              embeddingStatus: "pending" as const,
+              embeddingVersion: EMBEDDING_VERSION,
+            }
+          : {}),
+        updatedAt: now,
+      });
+      await ctx.scheduler.runAfter(delay, internal.assistant.generateFaqAudio, {
+        faqId,
+      });
+      audioScheduled += 1;
+      if (seed.intent) {
+        await ctx.scheduler.runAfter(delay, internal.assistant.generateFaqEmbedding, {
+          faqId,
+        });
+        embeddingsScheduled += 1;
+      }
+      continue;
+    }
+
+    const answerChanged = existing.answer !== seed.answer;
+    const orderChanged = existing.sortOrder !== index;
+    const questionChanged = existing.question !== seed.question;
+    const aliasesChanged =
+      JSON.stringify(existing.aliases) !== JSON.stringify(seed.aliases);
+    const intentChanged = existing.intent !== seed.intent;
+    const signalsChanged =
+      JSON.stringify(existing.matchSignals ?? []) !== JSON.stringify(seed.matchSignals);
+    const needsAudio =
+      answerChanged ||
+      !existing.audioStorageId ||
+      existing.audioStatus === "failed" ||
+      (force && existing.audioStatus !== "ready");
+    const needsEmbedding =
+      Boolean(seed.intent) &&
+      (intentChanged ||
+        !existing.embedding ||
+        existing.embeddingStatus === "failed" ||
+        existing.embeddingVersion !== EMBEDDING_VERSION ||
+        (force && existing.embeddingStatus !== "ready"));
+
+    if (
+      answerChanged ||
+      orderChanged ||
+      questionChanged ||
+      aliasesChanged ||
+      intentChanged ||
+      signalsChanged ||
+      needsAudio ||
+      needsEmbedding
+    ) {
+      await ctx.db.patch(existing._id, {
+        answer: seed.answer,
+        sortOrder: index,
+        question: seed.question,
+        aliases: [...seed.aliases],
+        intent: seed.intent,
+        matchSignals: [...seed.matchSignals],
+        ...(needsAudio ? { audioStatus: "pending" as const } : {}),
+        ...(needsEmbedding
+          ? {
+              embedding: undefined,
+              embeddingStatus: "pending" as const,
+              embeddingVersion: EMBEDDING_VERSION,
+            }
+          : {}),
+        updatedAt: now,
+      });
+    }
+
+    if (needsAudio && (answerChanged || existing.audioStatus !== "pending" || force)) {
+      await ctx.scheduler.runAfter(delay, internal.assistant.generateFaqAudio, {
+        faqId: existing._id,
+      });
+      audioScheduled += 1;
+    }
+    if (
+      needsEmbedding &&
+      (intentChanged ||
+        existing.embeddingVersion !== EMBEDDING_VERSION ||
+        existing.embeddingStatus !== "pending" ||
+        force)
+    ) {
+      await ctx.scheduler.runAfter(delay, internal.assistant.generateFaqEmbedding, {
+        faqId: existing._id,
+      });
+      embeddingsScheduled += 1;
+    }
+  }
+
+  const config = await ctx.db
+    .query("assistantConfig")
+    .withIndex("by_key", (query) => query.eq("key", CATALOG_CONFIG_KEY))
+    .unique();
+  if (config)
+    await ctx.db.patch(config._id, { value: FAQ_CATALOG_VERSION, updatedAt: now });
+  else
+    await ctx.db.insert("assistantConfig", {
+      key: CATALOG_CONFIG_KEY,
+      value: FAQ_CATALOG_VERSION,
+      updatedAt: now,
+    });
+
+  return { audioScheduled, embeddingsScheduled };
+}
+
+export const provisionCatalog = internalMutation({
+  args: { force: v.boolean() },
+  handler: (ctx, { force }) => reconcileCatalog(ctx, force),
+});
 
 export const initialize = internalMutation({
   args: { visitorToken: v.string() },
@@ -199,76 +181,6 @@ export const initialize = internalMutation({
       visitor = { ...visitor, used: 0, windowStartedAt: 0, updatedAt: now };
     }
 
-    for (const seed of SEEDED_FAQS) {
-      const existing = await ctx.db
-        .query("faqs")
-        .withIndex("by_key", (query) => query.eq("key", seed.key))
-        .unique();
-
-      if (!existing) {
-        const faqId = await ctx.db.insert("faqs", {
-          ...seed,
-          aliases: [...seed.aliases],
-          matchSignals: [...seed.matchSignals],
-          audioStatus: "pending",
-          ...(seed.intent ? { embeddingStatus: "pending" as const } : {}),
-          updatedAt: now,
-        });
-        await ctx.scheduler.runAfter(0, internal.assistant.generateFaqAudio, {
-          faqId,
-        });
-        if (seed.intent)
-          await ctx.scheduler.runAfter(0, internal.assistant.generateFaqEmbedding, {
-            faqId,
-          });
-      } else if (existing.audioStatus === "failed") {
-        await ctx.db.patch(existing._id, { audioStatus: "pending", updatedAt: now });
-        await ctx.scheduler.runAfter(0, internal.assistant.generateFaqAudio, {
-          faqId: existing._id,
-        });
-      }
-
-      if (existing) {
-        const questionChanged = existing.question !== seed.question;
-        const aliasesChanged =
-          JSON.stringify(existing.aliases) !== JSON.stringify(seed.aliases);
-        const intentChanged = existing.intent !== seed.intent;
-        const signalsChanged =
-          JSON.stringify(existing.matchSignals ?? []) !==
-          JSON.stringify(seed.matchSignals);
-        const needsEmbedding =
-          Boolean(seed.intent) &&
-          (intentChanged || !existing.embedding || existing.embeddingStatus === "failed");
-
-        if (
-          questionChanged ||
-          aliasesChanged ||
-          intentChanged ||
-          signalsChanged ||
-          needsEmbedding
-        ) {
-          await ctx.db.patch(existing._id, {
-            question: seed.question,
-            aliases: [...seed.aliases],
-            intent: seed.intent,
-            matchSignals: [...seed.matchSignals],
-            ...(needsEmbedding
-              ? { embedding: undefined, embeddingStatus: "pending" as const }
-              : {}),
-            updatedAt: now,
-          });
-        }
-        if (
-          seed.intent &&
-          needsEmbedding &&
-          (intentChanged || existing.embeddingStatus !== "pending")
-        )
-          await ctx.scheduler.runAfter(0, internal.assistant.generateFaqEmbedding, {
-            faqId: existing._id,
-          });
-      }
-    }
-
     const greeting = await ctx.db
       .query("faqs")
       .withIndex("by_key", (query) => query.eq("key", "greeting"))
@@ -286,9 +198,56 @@ export const initialize = internalMutation({
   },
 });
 
+export const catalogStatus = internalQuery({
+  args: {},
+  handler: async (ctx) => {
+    const expectedKeys = new Set(SEEDED_FAQS.map(({ key }) => key));
+    const faqs = (await ctx.db.query("faqs").collect()).filter(({ key }) =>
+      expectedKeys.has(key),
+    );
+    const config = await ctx.db
+      .query("assistantConfig")
+      .withIndex("by_key", (query) => query.eq("key", CATALOG_CONFIG_KEY))
+      .unique();
+
+    return {
+      version: config?.value ?? null,
+      expectedRecords: SEEDED_FAQS.length,
+      preparedQuestions: PREPARED_QUESTION_COUNT,
+      records: faqs.length,
+      audioReady: faqs.filter(({ audioStatus }) => audioStatus === "ready").length,
+      audioFailed: faqs.filter(({ audioStatus }) => audioStatus === "failed").length,
+      embeddingsReady: faqs.filter(
+        ({ embeddingStatus, embeddingVersion }) =>
+          embeddingStatus === "ready" && embeddingVersion === EMBEDDING_VERSION,
+      ).length,
+      embeddingsFailed: faqs.filter(({ embeddingStatus }) => embeddingStatus === "failed")
+        .length,
+    };
+  },
+});
+
 export const faqsForMatching = internalQuery({
   args: {},
-  handler: (ctx) => ctx.db.query("faqs").collect(),
+  handler: async (ctx) =>
+    (await ctx.db.query("faqs").collect()).map(
+      ({ _id, key, answer, aliases, matchSignals, audioStorageId }) => ({
+        _id,
+        key,
+        answer,
+        aliases,
+        matchSignals,
+        audioStorageId,
+      }),
+    ),
+});
+
+export const faqEmbeddings = internalQuery({
+  args: { faqIds: v.array(v.id("faqs")) },
+  handler: async (ctx, { faqIds }) =>
+    (await Promise.all(faqIds.map((faqId) => ctx.db.get(faqId)))).flatMap((faq) =>
+      faq?.embedding ? [faq] : [],
+    ),
 });
 
 export const freeQuestions = internalQuery({
@@ -302,6 +261,7 @@ export const freeQuestions = internalQuery({
           faq.audioStatus === "ready" &&
           Boolean(faq.audioStorageId),
       )
+      .sort((left, right) => (left.sortOrder ?? 999) - (right.sortOrder ?? 999))
       .map(({ key, question }) => ({ key, question: question ?? "" })),
 });
 
@@ -406,11 +366,19 @@ export const finishFaqAudio = internalMutation({
     audioStorageId: v.optional(v.id("_storage")),
   },
   handler: async (ctx, { faqId, status, audioStorageId }) => {
+    const faq = await ctx.db.get(faqId);
     await ctx.db.patch(faqId, {
       audioStatus: status,
-      audioStorageId,
+      ...(status === "ready" ? { audioStorageId } : {}),
       updatedAt: Date.now(),
     });
+    if (
+      status === "ready" &&
+      faq?.audioStorageId &&
+      audioStorageId &&
+      faq.audioStorageId !== audioStorageId
+    )
+      await ctx.storage.delete(faq.audioStorageId);
   },
 });
 
@@ -473,6 +441,7 @@ export const finishFaqEmbedding = internalMutation({
   handler: async (ctx, { faqId, status, embedding }) => {
     await ctx.db.patch(faqId, {
       embeddingStatus: status,
+      embeddingVersion: EMBEDDING_VERSION,
       embedding,
       updatedAt: Date.now(),
     });
@@ -483,7 +452,12 @@ export const generateFaqEmbedding = internalAction({
   args: { faqId: v.id("faqs") },
   handler: async (ctx, { faqId }) => {
     const faq = await ctx.runQuery(internal.assistant.faqForGeneration, { faqId });
-    if (!faq || faq.embeddingStatus === "ready" || !faq.intent) return;
+    if (
+      !faq ||
+      (faq.embeddingStatus === "ready" && faq.embeddingVersion === EMBEDDING_VERSION) ||
+      !faq.intent
+    )
+      return;
 
     try {
       const embedding = await createEmbedding(faq.intent);

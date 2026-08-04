@@ -42,10 +42,7 @@ export const routeTurn = internalAction({
   },
   handler: async (ctx, { visitorToken, question }): Promise<RouteResult> => {
     const normalized = normalizeAssistantQuestion(question);
-    const faqs: Doc<"faqs">[] = await ctx.runQuery(
-      internal.assistant.faqsForMatching,
-      {},
-    );
+    const faqs = await ctx.runQuery(internal.assistant.faqsForMatching, {});
     const exact = faqs.find((faq) => faq.aliases.includes(normalized));
 
     if (exact) {
@@ -62,10 +59,15 @@ export const routeTurn = internalAction({
       };
     }
 
+    const currentQuota: QuotaResult = await ctx.runMutation(
+      internal.assistant.updateQuota,
+      { visitorToken, reserve: false },
+    );
+    if (currentQuota.remaining === 0) return { kind: "limited" as const, remaining: 0 };
+
     const questionWords = normalized.split(" ");
-    const semanticCandidates = faqs.filter(
+    const semanticCandidateMetadata = faqs.filter(
       (faq) =>
-        faq.embedding &&
         faq.matchSignals &&
         hasSemanticSignal(normalized, faq.matchSignals) &&
         (hasPortfolioReferent(normalized) ||
@@ -73,8 +75,12 @@ export const routeTurn = internalAction({
             ["you", "your", "yourself"].some((word) => questionWords.includes(word)))),
     );
 
-    if (semanticCandidates.length > 0) {
+    if (semanticCandidateMetadata.length > 0) {
       try {
+        const semanticCandidates: Doc<"faqs">[] = await ctx.runQuery(
+          internal.assistant.faqEmbeddings,
+          { faqIds: semanticCandidateMetadata.map(({ _id }) => _id) },
+        );
         const questionEmbedding = await createEmbedding(question);
         const ranked = semanticCandidates
           .map((faq) => ({
@@ -91,16 +97,12 @@ export const routeTurn = internalAction({
           best.score >= SEMANTIC_MATCH_THRESHOLD &&
           margin >= SEMANTIC_MATCH_MARGIN
         ) {
-          const quota: QuotaResult = await ctx.runMutation(
-            internal.assistant.updateQuota,
-            { visitorToken, reserve: false },
-          );
           return {
             kind: "cached" as const,
             match: "semantic" as const,
             answer: best.faq.answer,
             audioStorageId: best.faq.audioStorageId,
-            remaining: quota.remaining,
+            remaining: currentQuota.remaining,
           };
         }
       } catch (error) {
@@ -114,5 +116,28 @@ export const routeTurn = internalAction({
     });
     if (!quota.allowed) return { kind: "limited" as const, remaining: 0 };
     return { kind: "realtime" as const, remaining: quota.remaining };
+  },
+});
+
+export const diagnoseTurn = internalAction({
+  args: { question: v.string() },
+  handler: async (ctx, { question }) => {
+    const normalized = normalizeAssistantQuestion(question);
+    const metadata = await ctx.runQuery(internal.assistant.faqsForMatching, {});
+    const faqs: Doc<"faqs">[] = await ctx.runQuery(internal.assistant.faqEmbeddings, {
+      faqIds: metadata.map(({ _id }) => _id),
+    });
+    const embedding = await createEmbedding(question);
+    const ranked = faqs
+      .filter((faq) => faq.embedding)
+      .map((faq) => ({
+        key: faq.key,
+        score: cosineSimilarity(embedding, faq.embedding ?? []),
+        signal: hasSemanticSignal(normalized, faq.matchSignals ?? []),
+      }))
+      .sort((left, right) => right.score - left.score)
+      .slice(0, 5);
+
+    return { normalized, portfolioReferent: hasPortfolioReferent(normalized), ranked };
   },
 });

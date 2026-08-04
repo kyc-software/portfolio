@@ -6,20 +6,14 @@ Keep browser-to-OpenAI WebRTC for low-latency speech. Put durable identity,
 weekly quota, FAQ routing, candidate logging, and generated audio in Convex.
 Portfolio server remains only browser-facing trust boundary.
 
-Version one deliberately supports seven cached entries:
-
-1. Session greeting.
-2. “Who are you?” and normalized aliases.
-3. Profile overview.
-4. Next.js experience.
-5. Latest projects.
-6. Location.
-7. Working style.
+Production catalog contains one session greeting and 50 prepared questions covering
+profile, skills, projects, leadership, location, availability, education, and
+contact. Canonical inventory: [prepared-questions.md](prepared-questions.md).
 
 Each question follows one route: normalized exact alias, semantic FAQ intent,
 then Realtime fallback. Semantic matching uses one stored embedding per FAQ,
 question embedding, cosine similarity, intent signals, confidence threshold, and
-runner-up margin. Seven entries do not justify vector-index complexity. Cache
+runner-up margin. Fifty bounded entries do not justify vector-index complexity. Cache
 misses remain logged as candidates without automatic promotion.
 
 ## Components
@@ -64,10 +58,7 @@ sequenceDiagram
   Visitor->>Browser: Start conversation
   Browser->>Portfolio: POST WebRTC offer
   Portfolio->>Portfolio: Read or issue HttpOnly visitor cookie
-  Portfolio->>Convex: Initialize visitor and seeded FAQs
-  Convex-->>Convex: Schedule missing greeting/identity audio
-  Convex->>Speech: Generate MP3 once
-  Speech-->>Convex: Audio bytes
+  Portfolio->>Convex: Initialize visitor and load greeting
   Convex-->>Portfolio: Remaining quota + greeting URL when ready
   Portfolio->>Realtime: Create WebRTC session
   Realtime-->>Browser: WebRTC answer
@@ -135,7 +126,7 @@ sequenceDiagram
   Browser->>Browser: Run normal turn pipeline
 ```
 
-Question labels are curated seed data and reconcile during initialization. Ready
+Question labels are curated catalog data provisioned explicitly during deployment. Ready
 session auto-opens and fetches picker once; first user turn collapses it, with manual
 reopening always available. List is session-cached in component and HTTP response
 may be privately cached for five minutes. UI accepts arbitrary catalog size;
@@ -147,7 +138,9 @@ preserve visible transcript space.
 - Ten uncached Realtime answers per anonymous visitor window.
 - Window lasts seven days from first uncached answer.
 - Greeting and cached FAQ hits do not spend answer quota. Semantic matching has a
-  small embedding cost but does not consume live-answer quota.
+  small embedding cost but does not consume live-answer quota. Once quota reaches
+  zero, unknown questions skip embedding and fail closed; exact prepared questions
+  remain available.
 - Convex mutation makes check and increment atomic across tabs/deployments.
 - Production fails closed when Convex is unavailable; development keeps a
   local ten-answer fallback so UI and OpenAI fallbacks remain testable.
@@ -160,18 +153,15 @@ limit reduces trivial repeated resets.
 
 ## Cache lifecycle
 
-Seed data is idempotent. First successful Convex initialization creates missing
-FAQ rows and schedules audio plus intent-embedding generation. `pending`, `ready`,
-and `failed` state prevents duplicate generation and permits retry after failure.
-Changing curated intent text invalidates and regenerates its embedding.
-Curated question labels, aliases, and intent signals reconcile on initialization,
-so discovery copy plus pronoun and nickname coverage update without replacing
-stored audio.
+Catalog provisioning is explicit, idempotent, versioned, and outside visitor session
+startup. It creates or reconciles 51 records and schedules missing audio plus
+intent-embedding generation with a short stagger. `pending`, `ready`, and `failed`
+states prevent duplicate work. Answer changes regenerate audio; intent or embedding
+version changes regenerate embeddings. Routine initialization performs no catalog scan.
 
 Audio files are immutable Convex storage objects. FAQ rows keep storage ID;
-request-time lookup resolves current URL. Version-one seed answers are code-owned;
-changing one requires replacing corresponding FAQ row or adding seed-reconciliation
-logic before deployment.
+request-time lookup resolves current URL. Replacements remove superseded stored audio.
+Catalog answers remain code-owned and deployment reconciliation is required after edits.
 
 Cache-miss candidates are stored but never auto-promoted. Review occurrence data,
 then add deliberate aliases, intent signals, and verified answer/audio entries.
@@ -209,10 +199,10 @@ browser response control removed, or a server-owned Realtime connection.
 
 1. Exact normalized aliases return immediately.
 2. Remaining portfolio questions pass intent-signal eligibility.
-3. `text-embedding-3-small` embeds question; direct cosine comparison ranks six
-   stored intent vectors.
+3. `text-embedding-3-small` embeds eligible questions at 512 dimensions; direct
+   cosine comparison ranks only signal-eligible stored vectors.
 4. Confident semantic matches reuse verified text and MP3 without spending quota.
 5. Ambiguous or unmatched questions atomically reserve quota and use Realtime.
 6. Development marks semantic hits beside Prepared; production shows only Prepared.
-7. Persistent lazy picker gives visitors direct access to every ready cached answer,
+7. Persistent lazy picker gives visitors direct access to all 50 ready cached answers,
    including after live-answer quota is exhausted.
