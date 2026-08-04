@@ -891,6 +891,7 @@ export function VoiceAssistant() {
               <small className="voice-experimental">Experimental</small>
             </span>
             <small>Realtime AI voice · microphone optional</small>
+            <small>70+ languages supported</small>
           </span>
           <svg className="voice-arrow" viewBox="0 0 84 52" aria-hidden="true">
             <path d="M4 40C20 8 49 1 78 9" />

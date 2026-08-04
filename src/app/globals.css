@@ -2346,8 +2346,8 @@ a[href]:active {
 
   .voice-guide {
     position: absolute;
-    right: 1rem;
-    bottom: 0.8rem;
+    right: 1.25rem;
+    bottom: 4.5rem;
   }
 
   .voice-invite-copy,
@@ -2445,7 +2445,7 @@ a[href]:active {
   }
 
   .hero-intro > p:nth-of-type(2) {
-    max-width: 25rem;
+    max-width: calc(100% - 4.75rem);
     margin-top: 1.15rem;
     font-size: 0.88rem;
   }
