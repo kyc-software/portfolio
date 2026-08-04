@@ -1,7 +1,7 @@
 # Voice assistant production audit
 
 Date: 2026-08-04  
-Pre-deployment release confidence: **5/5 for portfolio-scale production**
+Convex production readiness: **5/5 for portfolio-scale production**
 
 ## Verified production state
 
@@ -13,11 +13,13 @@ Pre-deployment release confidence: **5/5 for portfolio-scale production**
   1/2 GB database I/O, 1/2 GB egress, and 1/2 GB-hours action compute; monthly
   100k/250k calls, 5/10 GB database I/O, 10/20 GB egress, and 1/3 GB-hours compute.
 - Exact and semantic production probes returned stored answer/audio without spending quota.
+- Candidate learning schema, indexes, background worker, and manual review operations are
+  deployed; production review queue was empty after deployment.
 - Measured Convex routing: 13–23 ms for warm exact hits; about 298 ms for a semantic
   hit including OpenAI question embedding.
 - Formatting, types, 15 automated tests, and production build pass.
 
-## Improvements in this release candidate
+## Improvements deployed to Convex production
 
 - Moved catalog reconciliation out of visitor startup into explicit deployment provisioning.
 - Added catalog version, readiness report, failure counts, and safe retry command.
