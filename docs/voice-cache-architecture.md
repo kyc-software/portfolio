@@ -159,7 +159,7 @@ preserve visible transcript space.
 
 ## Quota
 
-- Ten uncached Realtime answers per anonymous visitor window.
+- Twenty uncached Realtime answers per anonymous visitor window.
 - Window lasts seven days from first uncached answer.
 - Greeting and cached FAQ hits do not spend answer quota. Semantic matching has a
   small embedding cost but does not consume live-answer quota. Once quota reaches
@@ -167,7 +167,7 @@ preserve visible transcript space.
   remain available.
 - Convex mutation makes check and increment atomic across tabs/deployments.
 - Production fails closed when Convex is unavailable; development keeps a
-  local ten-answer fallback so UI and OpenAI fallbacks remain testable.
+  local twenty-answer fallback so UI and OpenAI fallbacks remain testable.
 - Existing short-window IP/session limiter remains defense in depth.
 
 Weekly quota controls paid answers. Separate distributed limits control request volume,

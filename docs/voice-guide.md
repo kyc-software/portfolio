@@ -88,7 +88,7 @@ routing verification.
 ## Runtime behavior
 
 - Secure, HttpOnly, host-only visitor cookie persists anonymous identity.
-- Visitor gets ten uncached answers during seven-day window starting at first miss.
+- Visitor gets twenty uncached answers during seven-day window starting at first miss.
 - Every turn first passes distributed Convex visitor and global burst limits. This
   includes exact prepared answers, so cached audio cannot be spammed through normal UI/API.
 - FAQ lookup happens before quota charge: exact normalized alias first, then

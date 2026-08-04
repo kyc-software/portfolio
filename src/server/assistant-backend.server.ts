@@ -90,7 +90,7 @@ export async function initializeAssistant(request: Request) {
     );
     return {
       allowed: true as const,
-      remaining: 10,
+      remaining: 20,
       greeting: null,
       cookie: visitor.header,
     };
@@ -129,7 +129,7 @@ export async function routeAssistantTurn(request: Request, question: string) {
       error instanceof Error ? error.message : "Error",
     );
     return {
-      result: { kind: "realtime", remaining: 10 } as const,
+      result: { kind: "realtime", remaining: 20 } as const,
       cookie: visitor.header,
     };
   }

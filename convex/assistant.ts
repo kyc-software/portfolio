@@ -17,7 +17,7 @@ import {
 } from "./rateLimits";
 import { createSpeech } from "./speech";
 
-const QUESTION_LIMIT = 10;
+const QUESTION_LIMIT = 20;
 const QUOTA_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 
 const CATALOG_CONFIG_KEY = "faqCatalogVersion";
