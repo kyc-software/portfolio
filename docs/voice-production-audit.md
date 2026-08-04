@@ -1,7 +1,7 @@
 # Voice assistant production audit
 
 Date: 2026-08-04  
-Release confidence: **4.5/5 for portfolio-scale production**
+Pre-deployment release confidence: **5/5 for portfolio-scale production**
 
 ## Verified production state
 
@@ -15,9 +15,9 @@ Release confidence: **4.5/5 for portfolio-scale production**
 - Exact and semantic production probes returned stored answer/audio without spending quota.
 - Measured Convex routing: 13–23 ms for warm exact hits; about 298 ms for a semantic
   hit including OpenAI question embedding.
-- Formatting, types, 12 automated tests, and production build pass.
+- Formatting, types, 15 automated tests, and production build pass.
 
-## Minor improvements shipped
+## Improvements in this release candidate
 
 - Moved catalog reconciliation out of visitor startup into explicit deployment provisioning.
 - Added catalog version, readiness report, failure counts, and safe retry command.
@@ -45,6 +45,35 @@ Release confidence: **4.5/5 for portfolio-scale production**
   text and stored audio fully usable.
 - Synchronized development with production baseline: 51 audio files and 50 embeddings
   ready with zero failures.
+- Added asynchronous candidate learning outside response latency: separate occurrence
+  queue, embedding retries, confidence-gated intent grouping, and two-distinct-visitor
+  demand threshold.
+- Added serialized, rate-limited candidate preparation with strict structured output,
+  exact profile evidence validation, profile-version locking, bounded retries, and staged
+  audio/embedding creation.
+- Added manual approve/reject/regenerate/rollback operations. Candidate-created FAQs rank
+  after seeded content; rollback removes learned aliases or disables dynamic entries.
+- Fixed candidate spend accounting so retries and manual regeneration do not consume
+  additional daily new-intent allowances.
+
+## Final development QA
+
+- Catalog: 51 records, 51 MP3s, 50 baseline embeddings, zero failures.
+- Cached exact route returned stored text/audio and preserved weekly quota.
+- Semantic route preserved quota and development routing label.
+- Live fallback displayed visitor transcript immediately, showed Thinking marker,
+  returned complete answer, and decremented quota once.
+- Prepared picker opened beside greeting, collapsed after first turn, remained reopenable,
+  and preserved full transcript scrolling.
+- Conversation end removed panel and next start created fresh context.
+- Rapid prepared-answer requests triggered distributed turn throttle.
+- Candidate existing-FAQ approval/rollback and new-FAQ staging/audio/approval/rollback
+  completed against development Convex. A model-wrapped evidence quote exposed one
+  deterministic-validation edge case; surrounding quotation marks are now normalized
+  and covered by automated test.
+- Current localhost page produced no console errors. Responsive rules remain covered by
+  existing mobile layout implementation; temporary in-app-browser viewport override was
+  unavailable in this QA runtime, so physical mobile smoke test remains release checklist.
 
 ## Major improvements not implemented
 
@@ -74,7 +103,10 @@ These need architectural or product decisions:
 - Verify production portfolio environment has `OPENAI_API_KEY`, `CONVEX_SITE_URL`, and
   `CONVEX_BRIDGE_SECRET`; Convex needs matching `BRIDGE_SECRET` plus `OPENAI_API_KEY`.
 - Keep catalog readiness at 51 audio / 50 embeddings / zero failures before each release.
-- Review cache-miss candidates and logs; promote only verified, recurring intents.
+- Review `ready_for_review` candidates; approve only verified proposals. Use rollback for
+  any published alias/topic that routes incorrectly.
+- Run one physical-phone smoke test for panel sizing, prepared-list scrolling, audio,
+  microphone permission, and conversation end before public launch.
 
 ## References
 

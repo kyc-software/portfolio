@@ -11,6 +11,7 @@
   "scripts": {
     "dev": "vite dev",
     "build": "vite build",
+    "assistant:sync-profile": "bun scripts/sync-assistant-profile.ts",
     "start": "bun .output/server/index.mjs",
     "test": "bun test",
     "lint": "biome lint --no-errors-on-unmatched .",

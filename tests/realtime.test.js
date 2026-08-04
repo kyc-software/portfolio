@@ -1,5 +1,12 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
+import { readFileSync } from "node:fs";
 import test from "node:test";
+import {
+  ANTHONY_PROFILE,
+  ANTHONY_PROFILE_VERSION,
+} from "../convex/anthonyProfile.generated.ts";
+import { parseCandidateProposal, selectCandidateCluster } from "../convex/candidates.ts";
 import {
   cosineSimilarity,
   EMBEDDING_DIMENSIONS,
@@ -183,5 +190,82 @@ test("requires portfolio subject and FAQ intent signals", () => {
   assert.equal(
     hasSemanticSignal("what was anthony s latest role", ["latest project"]),
     false,
+  );
+});
+
+test("keeps generated Convex profile synchronized with Markdown source", () => {
+  const source = readFileSync(
+    new URL("../src/content/anthony-profile.md", import.meta.url),
+    "utf8",
+  );
+  assert.equal(ANTHONY_PROFILE, source);
+  assert.equal(
+    ANTHONY_PROFILE_VERSION,
+    createHash("sha256").update(source).digest("hex").slice(0, 16),
+  );
+});
+
+test("clusters only confident candidate paraphrases", () => {
+  assert.equal(
+    selectCandidateCluster(
+      [1, 0],
+      [
+        { id: "same", embedding: [1, 0] },
+        { id: "different", embedding: [0, 1] },
+      ],
+    ),
+    "same",
+  );
+  assert.equal(
+    selectCandidateCluster(
+      [1, 0],
+      [
+        { id: "ambiguous-a", embedding: [1, 0] },
+        { id: "ambiguous-b", embedding: [0.999, 0.04] },
+      ],
+    ),
+    null,
+  );
+});
+
+test("accepts only concise proposals grounded in current profile", () => {
+  const evidence = "Senior product engineer, full-stack developer, agile coach";
+  const valid = parseCandidateProposal(
+    {
+      supported: true,
+      canonicalQuestion: "Has Anthony worked as an agile coach?",
+      answer:
+        "Yes. Anthony has worked as an agile coach alongside his software engineering and leadership work.",
+      intent: "Anthony's agile coaching experience.",
+      aliases: ["Has he coached agile teams?"],
+      matchSignals: ["agile coach"],
+      evidence: [`“${evidence}”`],
+      existingFaqKey: "",
+    },
+    ANTHONY_PROFILE,
+    new Set(),
+  );
+  assert.equal(valid?.kind, "valid");
+
+  assert.equal(
+    parseCandidateProposal(
+      {
+        supported: true,
+        canonicalQuestion: "What is Anthony's favorite planet?",
+        answer: "Anthony's favorite planet is Mars.",
+        intent: "Anthony's favorite planet.",
+        aliases: ["Which planet does he like?"],
+        matchSignals: ["favorite planet"],
+        evidence: ["Anthony's favorite planet is Mars"],
+        existingFaqKey: "",
+      },
+      ANTHONY_PROFILE,
+      new Set(),
+    ),
+    null,
+  );
+  assert.deepEqual(
+    parseCandidateProposal({ supported: false }, ANTHONY_PROFILE, new Set()),
+    { kind: "unsupported" },
   );
 });

@@ -100,7 +100,7 @@ const candidate = httpAction(async (ctx, request) => {
   )
     return json({ error: "Invalid candidate" }, 400);
 
-  await ctx.runMutation(internal.assistant.recordCandidate, {
+  await ctx.runMutation(internal.candidates.recordCandidate, {
     visitorToken: body.visitorToken,
     question: body.question.trim(),
     answer: body.answer.trim(),

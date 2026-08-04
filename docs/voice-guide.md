@@ -5,8 +5,8 @@
 Landing-page assistant answers from Anthony's curated Markdown profile. OpenAI
 Realtime handles live speech over WebRTC. Convex owns anonymous weekly quota,
 exact and semantic FAQ routing, reusable audio, prepared-question discovery, and
-cache-candidate analytics. Browser never receives OpenAI keys or Convex bridge
-secret.
+an asynchronously prepared FAQ-candidate queue. Browser never receives OpenAI keys
+or Convex bridge secret.
 
 Detailed diagrams and trust boundaries: [voice-cache-architecture.md](voice-cache-architecture.md).
 Production findings and readiness: [voice-production-audit.md](voice-production-audit.md).
@@ -120,8 +120,14 @@ routing verification.
   preserving follow-up context.
 - Missing MP3 still renders its prepared transcript; Realtime availability never gates
   prepared content.
-- Cache misses reserve one credit atomically, use Realtime, then upsert question and
-  answer into `candidates` for later FAQ review. Candidates never auto-promote.
+- Cache misses reserve one credit atomically and use Realtime. Completed answers are
+  recorded asynchronously, embedded, and grouped by intent. Two distinct visitors
+  must ask a matching question before preparation begins.
+- Candidate preparation runs after the response path, one worker at a time. It uses
+  structured output grounded only in the versioned Markdown profile. New intents stage
+  a 512-dimension embedding and MP3; existing intents stage aliases only. Every result
+  requires manual approval before becoming searchable. Rejection, regeneration, and
+  rollback remain available.
 - Common microphone fillers are ignored without spending quota.
 - Input transcription deltas render while visitor speaks. Inline status markers
   label conversation initialization and thinking without adding fake message
@@ -134,12 +140,16 @@ routing verification.
 
 ## Main parts
 
-- `convex/schema.ts`: visitors, FAQs, candidates.
+- `convex/schema.ts`: visitors, FAQs, candidates, and candidate occurrences.
 - `convex/convex.config.ts` and `convex/rateLimits.ts`: Convex rate-limiter component
   plus visitor/global policies for turns, sessions, browsing, and candidate writes.
 - `convex/faqCatalog.ts`: versioned production questions, answers, aliases, and signals.
-- `convex/assistant.ts`: provisioning, readiness, atomic quota, candidate upsert, Speech and stored
-  intent-embedding generation.
+- `convex/assistant.ts`: provisioning, readiness, atomic quota, and catalog reads.
+- `convex/candidates.ts`: background capture, intent clustering, grounded proposal
+  preparation, approval, rejection, regeneration, and rollback.
+- `convex/speech.ts`: shared OpenAI Speech generation.
+- `convex/anthonyProfile.generated.ts`: generated trusted profile snapshot and version.
+- `scripts/sync-assistant-profile.ts`: Markdown-to-Convex profile synchronization.
 - `convex/embeddings.ts`: official Embeddings API call and cosine similarity.
 - `convex/routing.ts`: exact/semantic/Realtime decision pipeline.
 - `convex/http.ts`: shared-secret HTTP bridge.
@@ -162,8 +172,10 @@ routing verification.
 - Convex rate-limiter component adds distributed visitor and global limits before
   expensive or repeatable work. Current policy: turns 12/minute with burst 2 per
   visitor; starts 4/10 minutes; panel bootstraps 12/10 minutes; prepared-list reads
-  6/minute with burst 2; candidate
-  writes 10/hour with burst 3. Global ceilings cover cookie rotation/distributed abuse.
+  6/minute with burst 2; candidate writes 10/hour with burst 3. Candidate preparation
+  is capped at three new intents per 24 hours, serialized globally, and retried at most
+  three times. One candidate consumes one preparation allowance; retries do not.
+  Global ceilings cover cookie rotation/distributed abuse.
 - Deployment warning and hard-disable limits cap daily/monthly function calls,
   database I/O, egress, and action compute.
 - User can erase browser data to receive new anonymous identity. Preventing this
@@ -179,11 +191,26 @@ bun run verify
 ```
 
 Automated tests cover FAQ normalization, semantic guards, cosine comparison, filler
-filtering, Realtime events, session limiting, type safety, formatting, and production
-build. Catalog tests enforce exactly 50 unique and complete prepared questions.
+filtering, Realtime events, session limiting, candidate clustering, grounded proposal
+validation, profile synchronization, type safety, formatting, and production build.
+Catalog tests enforce exactly 50 unique and complete baseline prepared questions.
 Production status confirms all audio and embeddings exist; routing probes confirm
 exact and semantic hits preserve quota. Live generation requires Convex
 `OPENAI_API_KEY`.
+
+Candidate operations require the same bridge secret and candidate ID:
+
+```bash
+bunx convex run candidates:listReady '{"secret":"<bridge-secret>"}'
+bunx convex run candidates:approve '{"secret":"<bridge-secret>","candidateId":"<id>"}'
+bunx convex run candidates:reject '{"secret":"<bridge-secret>","candidateId":"<id>"}'
+bunx convex run candidates:regenerate '{"secret":"<bridge-secret>","candidateId":"<id>"}'
+bunx convex run candidates:rollback '{"secret":"<bridge-secret>","candidateId":"<id>"}'
+```
+
+Add `--prod` only when reviewing production. Treat terminal history as sensitive because
+these commands contain bridge secret. After profile edits, run
+`bun run assistant:sync-profile` before verification and deployment.
 
 ## Official references
 

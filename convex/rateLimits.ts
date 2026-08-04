@@ -65,6 +65,11 @@ export const ASSISTANT_RATE_LIMITS = {
     capacity: 30,
     shards: 4,
   },
+  candidatePreparationGlobal: {
+    kind: "fixed window",
+    rate: 3,
+    period: 24 * HOUR,
+  },
 } as const;
 
 const rateLimiter = new RateLimiter(components.rateLimiter, ASSISTANT_RATE_LIMITS);
@@ -108,4 +113,8 @@ export function limitAssistantBrowse(ctx: MutationCtx, visitorToken: string) {
 
 export function limitAssistantCandidate(ctx: MutationCtx, visitorToken: string) {
   return consumePair(ctx, visitorToken, "candidatePerVisitor", "candidateGlobal");
+}
+
+export function limitCandidatePreparation(ctx: MutationCtx) {
+  return rateLimiter.limit(ctx, "candidatePreparationGlobal");
 }

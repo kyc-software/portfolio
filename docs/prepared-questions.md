@@ -2,6 +2,10 @@
 
 Production catalog version: `2026-08-04-50-v3`
 
+This is the code-owned baseline. Approved recurring candidate intents may add deployment-
+local questions or learned aliases in Convex after manual review; they do not replace or
+reorder this list.
+
 Each question has a verified answer, reusable MP3, and 512-dimension semantic
 embedding. Exact or confident semantic matches do not consume visitor quota.
 

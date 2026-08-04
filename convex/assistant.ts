@@ -1,6 +1,5 @@
 import { v } from "convex/values";
 
-import { normalizeAssistantQuestion } from "../src/lib/assistant-copy";
 import { internal } from "./_generated/api";
 import {
   internalAction,
@@ -13,10 +12,10 @@ import { FAQ_CATALOG_VERSION, PREPARED_QUESTION_COUNT, SEEDED_FAQS } from "./faq
 import {
   limitAssistantBootstrap,
   limitAssistantBrowse,
-  limitAssistantCandidate,
   limitAssistantSession,
   limitAssistantTurn,
 } from "./rateLimits";
+import { createSpeech } from "./speech";
 
 const QUESTION_LIMIT = 10;
 const QUOTA_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
@@ -47,6 +46,8 @@ async function reconcileCatalog(ctx: MutationCtx, force: boolean) {
         aliases: [...seed.aliases],
         matchSignals: [...seed.matchSignals],
         audioStatus: "pending",
+        source: "seeded",
+        active: true,
         ...(seed.intent
           ? {
               embeddingStatus: "pending" as const,
@@ -106,6 +107,8 @@ async function reconcileCatalog(ctx: MutationCtx, force: boolean) {
         aliases: [...seed.aliases],
         intent: seed.intent,
         matchSignals: [...seed.matchSignals],
+        source: "seeded",
+        active: true,
         ...(needsAudio ? { audioStatus: "pending" as const } : {}),
         ...(needsEmbedding
           ? {
@@ -260,23 +263,42 @@ export const catalogStatus = internalQuery({
 export const faqsForMatching = internalQuery({
   args: {},
   handler: async (ctx) =>
-    (await ctx.db.query("faqs").collect()).map(
-      ({ _id, key, answer, aliases, matchSignals, audioStorageId }) => ({
-        _id,
-        key,
-        answer,
-        aliases,
-        matchSignals,
-        audioStorageId,
-      }),
-    ),
+    (await ctx.db.query("faqs").collect())
+      .filter(({ active }) => active !== false)
+      .sort((left, right) =>
+        (left.source ?? "seeded") === (right.source ?? "seeded")
+          ? 0
+          : (left.source ?? "seeded") === "seeded"
+            ? -1
+            : 1,
+      )
+      .map(
+        ({
+          _id,
+          key,
+          answer,
+          aliases,
+          learnedAliases,
+          matchSignals,
+          audioStorageId,
+          source,
+        }) => ({
+          _id,
+          key,
+          answer,
+          aliases: [...aliases, ...(learnedAliases ?? [])],
+          matchSignals,
+          audioStorageId,
+          source: source ?? "seeded",
+        }),
+      ),
 });
 
 export const faqEmbeddings = internalQuery({
   args: { faqIds: v.array(v.id("faqs")) },
   handler: async (ctx, { faqIds }) =>
     (await Promise.all(faqIds.map((faqId) => ctx.db.get(faqId)))).flatMap((faq) =>
-      faq?.embedding ? [faq] : [],
+      faq?.embedding && faq.active !== false ? [faq] : [],
     ),
 });
 
@@ -286,6 +308,7 @@ export const freeQuestions = internalQuery({
     (await ctx.db.query("faqs").collect())
       .filter(
         (faq) =>
+          faq.active !== false &&
           faq.key !== "greeting" &&
           Boolean(faq.question) &&
           faq.audioStatus === "ready" &&
@@ -342,52 +365,6 @@ export const updateQuota = internalMutation({
   },
 });
 
-export const recordCandidate = internalMutation({
-  args: {
-    visitorToken: v.string(),
-    question: v.string(),
-    answer: v.string(),
-  },
-  handler: async (ctx, { visitorToken, question, answer }) => {
-    const candidateLimit = await limitAssistantCandidate(ctx, visitorToken);
-    if (!candidateLimit.ok) return;
-
-    const normalizedQuestion = normalizeAssistantQuestion(question);
-    if (!normalizedQuestion) return;
-
-    const cached = (await ctx.db.query("faqs").collect()).some((faq) =>
-      faq.aliases.includes(normalizedQuestion),
-    );
-    if (cached) return;
-
-    const existing = await ctx.db
-      .query("candidates")
-      .withIndex("by_question", (query) =>
-        query.eq("normalizedQuestion", normalizedQuestion),
-      )
-      .unique();
-    const now = Date.now();
-
-    if (existing) {
-      await ctx.db.patch(existing._id, {
-        question,
-        answer,
-        occurrences: existing.occurrences + 1,
-        updatedAt: now,
-      });
-      return;
-    }
-
-    await ctx.db.insert("candidates", {
-      normalizedQuestion,
-      question,
-      answer,
-      occurrences: 1,
-      updatedAt: now,
-    });
-  },
-});
-
 export const faqForGeneration = internalQuery({
   args: { faqId: v.id("faqs") },
   handler: (ctx, { faqId }) => ctx.db.get(faqId),
@@ -432,25 +409,7 @@ export const generateFaqAudio = internalAction({
     }
 
     try {
-      const response = await fetch("https://api.openai.com/v1/audio/speech", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model: "gpt-4o-mini-tts",
-          voice: "marin",
-          input: faq.answer,
-          instructions: "Speak naturally, warmly, and concisely.",
-          response_format: "mp3",
-        }),
-      });
-
-      if (!response.ok) throw new Error(`Speech generation failed: ${response.status}`);
-      const audioStorageId = await ctx.storage.store(
-        new Blob([await response.arrayBuffer()], { type: "audio/mpeg" }),
-      );
+      const audioStorageId = await ctx.storage.store(await createSpeech(faq.answer));
       await ctx.runMutation(internal.assistant.finishFaqAudio, {
         faqId,
         status: "ready",

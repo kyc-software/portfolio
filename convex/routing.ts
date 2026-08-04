@@ -22,6 +22,15 @@ export function hasSemanticSignal(question: string, signals: string[]) {
   return signals.some((signal) => containsPhrase(question, signal));
 }
 
+function confidentSemanticMatch(ranked: Array<{ faq: Doc<"faqs">; score: number }>) {
+  const best = ranked[0];
+  const runnerUp = ranked[1];
+  const margin = best ? best.score - (runnerUp?.score ?? -1) : 0;
+  return best && best.score >= SEMANTIC_MATCH_THRESHOLD && margin >= SEMANTIC_MATCH_MARGIN
+    ? best.faq
+    : null;
+}
+
 type RouteResult =
   | {
       kind: "cached";
@@ -98,20 +107,18 @@ export const routeTurn = internalAction({
             score: cosineSimilarity(questionEmbedding, faq.embedding ?? []),
           }))
           .sort((left, right) => right.score - left.score);
-        const best = ranked[0];
-        const runnerUp = ranked[1];
-        const margin = best ? best.score - (runnerUp?.score ?? -1) : 0;
+        const best =
+          confidentSemanticMatch(
+            ranked.filter(({ faq }) => (faq.source ?? "seeded") === "seeded"),
+          ) ??
+          confidentSemanticMatch(ranked.filter(({ faq }) => faq.source === "candidate"));
 
-        if (
-          best &&
-          best.score >= SEMANTIC_MATCH_THRESHOLD &&
-          margin >= SEMANTIC_MATCH_MARGIN
-        ) {
+        if (best) {
           return {
             kind: "cached" as const,
             match: "semantic" as const,
-            answer: best.faq.answer,
-            audioStorageId: best.faq.audioStorageId,
+            answer: best.answer,
+            audioStorageId: best.audioStorageId,
             remaining: currentQuota.remaining,
           };
         }

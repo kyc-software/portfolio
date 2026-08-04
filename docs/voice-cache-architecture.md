@@ -3,7 +3,7 @@
 ## Decision
 
 Keep browser-to-OpenAI WebRTC for low-latency speech. Put durable identity,
-weekly quota, distributed abuse limits, FAQ routing, candidate logging, and generated audio in Convex.
+weekly quota, distributed abuse limits, FAQ routing, candidate learning, and generated audio in Convex.
 Portfolio server remains only browser-facing trust boundary.
 
 Production catalog contains one session greeting and 50 prepared questions covering
@@ -14,7 +14,7 @@ Each question follows one route: normalized exact alias, semantic FAQ intent,
 then Realtime fallback. Semantic matching uses one stored embedding per FAQ,
 question embedding, cosine similarity, intent signals, confidence threshold, and
 runner-up margin. Fifty bounded entries do not justify vector-index complexity. Cache
-misses remain logged as candidates without automatic promotion.
+misses feed a background candidate pipeline; publication always requires manual approval.
 
 ## Components
 
@@ -25,6 +25,7 @@ flowchart LR
   C --> D["Visitor quota + FAQ + candidate tables"]
   C --> R["Convex rate-limiter component"]
   C --> F["Convex file storage"]
+  C --> Q["Serialized candidate worker + manual review"]
   C -->|"one-time FAQ embedding + eligible question embedding"| E["OpenAI Embeddings API"]
   C -->|"one-time speech generation"| T["OpenAI Speech API"]
   P -->|"session creation"| O["OpenAI Realtime API"]
@@ -119,8 +120,8 @@ sequenceDiagram
     Convex-->>Browser: Realtime allowed + updated remaining quota
     Browser->>Realtime: response.create
     Realtime-->>Browser: Spoken answer + transcript
-    Browser->>Portfolio: Log question/answer candidate
-    Portfolio->>Convex: Upsert candidate occurrence
+    Browser->>Portfolio: Log question/answer candidate (fire and forget)
+    Portfolio->>Convex: Store occurrence and schedule background work
   else Quota exhausted
     Convex-->>Browser: No generation allowed
     Browser->>Browser: Show local limit message; prepared picker remains usable
@@ -204,9 +205,49 @@ Catalog answers remain code-owned and deployment reconciliation is required afte
 Development and production use same catalog source but provision deployment-local
 records, storage files, and embeddings independently.
 
-Cache-miss candidates are stored but never auto-promoted. Review occurrence data,
-then add deliberate aliases, intent signals, and verified answer/audio entries.
-This avoids poisoning cache with visitor-generated content.
+## Candidate improvement lifecycle
+
+```mermaid
+sequenceDiagram
+  participant Chat as Completed live answer
+  participant Convex
+  participant Embed as OpenAI Embeddings
+  participant Prepare as OpenAI structured response
+  participant Speech as OpenAI Speech
+  actor Admin
+
+  Chat-->>Convex: Non-blocking candidate occurrence
+  Convex-->>Embed: Embed visitor question in background
+  Convex->>Convex: Confidently group intent + count distinct visitors
+  alt Fewer than two distinct visitors
+    Convex->>Convex: Keep collecting
+  else Repeated intent
+    Convex->>Convex: Acquire one global worker + daily preparation allowance
+    Convex-->>Prepare: Variants + FAQ metadata + versioned trusted profile
+    Prepare-->>Convex: Strict structured proposal + exact evidence quotes
+    Convex->>Convex: Deterministic grounding and length validation
+    alt Existing FAQ intent
+      Convex->>Convex: Stage learned aliases
+    else New FAQ intent
+      Convex-->>Embed: Stage intent embedding
+      Convex-->>Speech: Stage answer MP3
+    end
+    Convex-->>Admin: Ready for review
+    Admin->>Convex: Approve, reject, regenerate, or rollback
+  end
+```
+
+Visitor questions and their Realtime answers are evidence of demand, never trusted
+knowledge. Proposal generation receives them as untrusted data and may use only facts
+from generated profile snapshot. Deterministic checks require concise answers and exact
+profile quotations. Profile version mismatch blocks approval. New dynamic FAQs rank
+after code-owned baseline FAQs and cannot silently replace a seeded semantic winner.
+
+Candidate capture never awaits embedding, generation, speech, or review, so worker
+failure cannot delay chat. Occurrences retry independently; preparation is globally
+serialized, limited to three new intents per day, and bounded to three attempts. Two
+distinct anonymous visitors are required before spending preparation budget. Approval
+is atomic; rollback removes learned aliases or deactivates candidate-created FAQ.
 
 ## Environment
 
@@ -251,3 +292,5 @@ per-play authorization would require proxying audio through a controlled edge/se
 6. Development marks semantic hits beside Prepared; production shows only Prepared.
 7. Persistent lazy picker gives visitors direct access to all 50 ready cached answers,
    including after live-answer quota is exhausted.
+8. Repeated misses prepare grounded FAQ proposals asynchronously; humans control
+   publication and rollback.
