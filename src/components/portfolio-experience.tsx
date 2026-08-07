@@ -196,7 +196,9 @@ function LiveProject({
             </header>
 
             {project.concept ? (
-              <div className="concept-project">
+              <div
+                className={`concept-project${project.slug === "thales" ? " is-dark" : ""}`}
+              >
                 <img
                   src={project.cover.src}
                   alt=""

@@ -1824,6 +1824,10 @@ a[href]:active {
   background: #f4f7fb;
 }
 
+.concept-project.is-dark {
+  background: #101014;
+}
+
 .concept-project img {
   position: absolute;
   inset: 0;
