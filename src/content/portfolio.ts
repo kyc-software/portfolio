@@ -193,4 +193,21 @@ export const projects: Project[] = [
     confidentialityNote:
       "Concept visual — real internal software cannot be shown due to confidentiality obligations.",
   },
+  {
+    slug: "vivlio",
+    title: "Vivlio",
+    summary:
+      "Coached three teams delivering Vivlio’s digital reading ecosystem across web, mobile, and e-readers.",
+    role: "Scrum Master",
+    year: "2021 2022",
+    tags: ["React", "TypeScript", "React Native", "Tailwind CSS", "Storybook"],
+    cover: {
+      src: "/projects/vivlio.webp",
+      alt: "Vivlio digital reading website featuring a reader using an e-reader",
+      width: 1600,
+      height: 900,
+    },
+    liveUrl: "https://www.vivlio.com/en/",
+    embeddable: false,
+  },
 ];
