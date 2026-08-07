@@ -3,7 +3,7 @@ export type Project = {
   title: string;
   summary: string;
   role: string;
-  year: number;
+  year: number | string;
   tags: string[];
   cover: {
     src: string;
@@ -13,6 +13,8 @@ export type Project = {
   };
   liveUrl: string;
   embeddable?: boolean;
+  concept?: boolean;
+  confidentialityNote?: string;
 };
 
 export type SocialLink = {
@@ -140,7 +142,6 @@ export const projects: Project[] = [
       "Valkey",
       "SSE",
       "AI",
-      "Object storage",
     ],
     cover: {
       src: "/projects/pixlr.webp",
@@ -150,5 +151,24 @@ export const projects: Project[] = [
     },
     liveUrl: "https://pixlr.com/",
     embeddable: false,
+  },
+  {
+    slug: "carrefour",
+    title: "Carrefour",
+    summary:
+      "Supported teams delivering software that plans and coordinates item promotions across Carrefour stores.",
+    role: "Agile Coach · Consultant",
+    year: "2023 2024",
+    tags: [],
+    cover: {
+      src: "/projects/carrefour-promotion-concept.jpg",
+      alt: "Concept dashboard for managing Carrefour product promotions across stores",
+      width: 1672,
+      height: 941,
+    },
+    liveUrl: "https://www.carrefour.com/",
+    concept: true,
+    confidentialityNote:
+      "Concept visual — real internal software cannot be shown due to confidentiality obligations.",
   },
 ];

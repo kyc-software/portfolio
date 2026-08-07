@@ -40,50 +40,60 @@ function ProjectCard({
   project: Project;
   onOpen: (project: Project, trigger: HTMLButtonElement) => void;
 }) {
+  const content = (
+    <>
+      <div className="project-media">
+        <img
+          src={project.cover.src}
+          alt={project.cover.alt}
+          loading="lazy"
+          decoding="async"
+          className="fill-image"
+        />
+        <span className="project-open">
+          {project.concept ? "Open concept" : "Open live"}
+          <ArrowUpRight aria-hidden="true" />
+        </span>
+      </div>
+
+      <div className="project-card-copy">
+        <span className="project-year">{project.year}</span>
+        <div className="project-card-main">
+          <p>{project.role}</p>
+          <div className="project-title-row">
+            <h3>{project.title}</h3>
+            <ArrowUpRight aria-hidden="true" />
+          </div>
+          <p className="project-summary">{project.summary}</p>
+        </div>
+        {project.confidentialityNote ? (
+          <p className="project-confidentiality">{project.confidentialityNote}</p>
+        ) : (
+          <ul aria-label={`${project.title} technologies`}>
+            {project.tags.map((tag) => (
+              <li key={tag}>{tag}</li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </>
+  );
+
   return (
     <article className="project-card">
       <button
         type="button"
         className="project-card-trigger"
         onClick={(event) => {
-          if (project.embeddable === false) {
+          if (project.embeddable === false && !project.concept) {
             window.open(project.liveUrl, "_blank", "noopener,noreferrer");
             return;
           }
           onOpen(project, event.currentTarget);
         }}
-        aria-label={`Open ${project.title} website`}
+        aria-label={`Open ${project.title} ${project.concept ? "concept visual" : "website"}`}
       >
-        <div className="project-media">
-          <img
-            src={project.cover.src}
-            alt={project.cover.alt}
-            loading="lazy"
-            decoding="async"
-            className="fill-image"
-          />
-          <span className="project-open">
-            Open live
-            <ArrowUpRight aria-hidden="true" />
-          </span>
-        </div>
-
-        <div className="project-card-copy">
-          <span className="project-year">{project.year}</span>
-          <div className="project-card-main">
-            <p>{project.role}</p>
-            <div className="project-title-row">
-              <h3>{project.title}</h3>
-              <ArrowUpRight aria-hidden="true" />
-            </div>
-            <p className="project-summary">{project.summary}</p>
-          </div>
-          <ul aria-label={`${project.title} technologies`}>
-            {project.tags.map((tag) => (
-              <li key={tag}>{tag}</li>
-            ))}
-          </ul>
-        </div>
+        {content}
       </button>
     </article>
   );
@@ -122,7 +132,9 @@ function LiveProject({
         <DialogContent className="top-0 left-0 translate-x-0 translate-y-0 project-viewer">
           <DialogTitle className="sr-only">{project.title}</DialogTitle>
           <DialogDescription className="sr-only">
-            Live embedded preview of {project.title}
+            {project.concept
+              ? `Concept visual for ${project.title}`
+              : `Live embedded preview of ${project.title}`}
           </DialogDescription>
 
           <div className="viewer-shell">
@@ -140,62 +152,76 @@ function LiveProject({
 
               <div className="viewer-identity">
                 <strong>{project.title}</strong>
-                <span>{loaded ? "Live website" : "Connecting"}</span>
+                <span>
+                  {project.concept
+                    ? "Concept visual"
+                    : loaded
+                      ? "Live website"
+                      : "Connecting"}
+                </span>
               </div>
 
-              <div className="viewer-actions">
-                <Button
-                  type="button"
-                  variant="secondary"
-                  size="icon-sm"
-                  onClick={reload}
-                  aria-label={`Reload ${project.title}`}
-                >
-                  <RotateCw />
-                </Button>
-                <Button
-                  render={<a href={project.liveUrl} target="_blank" rel="noreferrer" />}
-                  variant="secondary"
-                  size="sm"
-                >
-                  Open site
-                  <ExternalLink data-icon="inline-end" />
-                </Button>
-              </div>
+              {project.concept ? null : (
+                <div className="viewer-actions">
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="icon-sm"
+                    onClick={reload}
+                    aria-label={`Reload ${project.title}`}
+                  >
+                    <RotateCw />
+                  </Button>
+                  <Button
+                    render={<a href={project.liveUrl} target="_blank" rel="noreferrer" />}
+                    variant="secondary"
+                    size="sm"
+                  >
+                    Open site
+                    <ExternalLink data-icon="inline-end" />
+                  </Button>
+                </div>
+              )}
             </header>
 
-            <div className="live-project">
-              <div className={`live-project-poster${loaded ? " is-hidden" : ""}`}>
-                <img
-                  src={project.cover.src}
-                  alt=""
-                  loading="eager"
-                  decoding="async"
-                  className="fill-image"
-                />
-                <div className="live-project-loading" role="status">
-                  <span />
-                  <strong>
-                    {timedOut ? "Preview unavailable" : `Opening ${project.title}`}
-                  </strong>
-                  <p>
-                    {timedOut
-                      ? "This site may block embedding. Use Open site."
-                      : "Loading live website"}
-                  </p>
-                </div>
+            {project.concept ? (
+              <div className="concept-project">
+                <img src={project.cover.src} alt={project.cover.alt} />
               </div>
+            ) : (
+              <div className="live-project">
+                <div className={`live-project-poster${loaded ? " is-hidden" : ""}`}>
+                  <img
+                    src={project.cover.src}
+                    alt=""
+                    loading="eager"
+                    decoding="async"
+                    className="fill-image"
+                  />
+                  <div className="live-project-loading" role="status">
+                    <span />
+                    <strong>
+                      {timedOut ? "Preview unavailable" : `Opening ${project.title}`}
+                    </strong>
+                    <p>
+                      {timedOut
+                        ? "This site may block embedding. Use Open site."
+                        : "Loading live website"}
+                    </p>
+                  </div>
+                </div>
 
-              <iframe
-                key={`${project.slug}-${reloadKey}`}
-                src={project.liveUrl}
-                title={`${project.title} live website`}
-                onLoad={() => setLoaded(true)}
-                referrerPolicy="strict-origin-when-cross-origin"
-                sandbox="allow-downloads allow-forms allow-modals allow-popups allow-popups-to-escape-sandbox allow-same-origin allow-scripts"
-                allow="clipboard-read; clipboard-write; fullscreen"
-              />
-            </div>
+                <iframe
+                  key={`${project.slug}-${reloadKey}`}
+                  src={project.liveUrl}
+                  title={`${project.title} live website`}
+                  onLoad={() => setLoaded(true)}
+                  referrerPolicy="strict-origin-when-cross-origin"
+                  sandbox="allow-downloads allow-forms allow-modals allow-popups allow-popups-to-escape-sandbox allow-same-origin allow-scripts"
+                  allow="clipboard-read; clipboard-write; fullscreen"
+                />
+              </div>
+            )}
           </div>
         </DialogContent>
       ) : null}
@@ -500,8 +526,9 @@ export function PortfolioExperience() {
                 </h2>
               </div>
               <p>
-                Products I took from concept to production across collaboration, learning,
-                finance, and operations. Explore every one live.
+                Selected product and team work across collaboration, learning, finance,
+                retail, and operations. Public products open live; confidential work uses
+                clearly labeled concept visuals.
               </p>
             </header>
 
