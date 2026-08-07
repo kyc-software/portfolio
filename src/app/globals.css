@@ -1674,12 +1674,16 @@ a[href]:active {
 }
 
 .project-card-copy li {
-  padding: 0.34rem 0.55rem;
+  display: inline-flex;
+  min-height: 1.5rem;
+  align-items: center;
+  padding: 0 0.55rem;
   border: 1px solid rgba(255, 255, 255, 0.14);
   border-radius: 999px;
   color: rgba(241, 238, 232, 0.62);
   font-family: var(--font-geist-mono), monospace;
   font-size: 0.51rem;
+  line-height: 1;
   text-transform: uppercase;
 }
 

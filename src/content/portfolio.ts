@@ -240,4 +240,21 @@ export const projects: Project[] = [
     confidentialityNote:
       "Concept visual — real internal software cannot be shown due to confidentiality obligations.",
   },
+  {
+    slug: "university-of-kent",
+    title: "Thesis",
+    summary:
+      "Worked on a three-person research project translating sign language in real time through wireless haptic gloves.",
+    role: "University of Kent · Developer",
+    year: 2018,
+    tags: ["React", "Python", "Haptic Gloves", "Sign Language"],
+    cover: {
+      src: "/projects/university-of-kent-haptic-gloves.webp",
+      alt: "Concept visual showing wireless haptic gloves beside calibration and sign-language recognition software",
+      width: 1600,
+      height: 900,
+    },
+    liveUrl: "https://www.youtube.com/watch?v=LHGellNWDiQ",
+    embeddable: false,
+  },
 ];
