@@ -33,6 +33,14 @@ import { getProjectSlug, validateProjects } from "@/lib/portfolio";
 
 const validProjects = validateProjects(projects);
 
+function preloadProjectCover(project: Project) {
+  if (!project.cover.fullSrc) return;
+  const image = new Image();
+  image.fetchPriority = "high";
+  image.src = project.cover.fullSrc;
+  void image.decode().catch(() => {});
+}
+
 function ProjectCard({
   project,
   onOpen,
@@ -84,6 +92,9 @@ function ProjectCard({
       <button
         type="button"
         className="project-card-trigger"
+        onPointerEnter={() => preloadProjectCover(project)}
+        onPointerDown={() => preloadProjectCover(project)}
+        onFocus={() => preloadProjectCover(project)}
         onClick={(event) => {
           if (project.embeddable === false && !project.concept) {
             window.open(project.liveUrl, "_blank", "noopener,noreferrer");
@@ -186,7 +197,19 @@ function LiveProject({
 
             {project.concept ? (
               <div className="concept-project">
-                <img src={project.cover.src} alt={project.cover.alt} />
+                <img
+                  src={project.cover.src}
+                  alt=""
+                  aria-hidden="true"
+                  className="concept-project-preview"
+                />
+                <img
+                  src={project.cover.fullSrc ?? project.cover.src}
+                  alt={project.cover.alt}
+                  fetchPriority="high"
+                  className={`concept-project-full${loaded ? " is-loaded" : ""}`}
+                  onLoad={() => setLoaded(true)}
+                />
               </div>
             ) : (
               <div className="live-project">

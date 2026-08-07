@@ -7,6 +7,7 @@ export type Project = {
   tags: string[];
   cover: {
     src: string;
+    fullSrc?: string;
     alt: string;
     width: number;
     height: number;
@@ -162,11 +163,32 @@ export const projects: Project[] = [
     tags: [],
     cover: {
       src: "/projects/carrefour-promotion-concept.jpg",
+      fullSrc: "/projects/carrefour-promotion-concept-full.png",
       alt: "Concept dashboard for managing Carrefour product promotions across stores",
       width: 1672,
       height: 941,
     },
     liveUrl: "https://www.carrefour.com/",
+    concept: true,
+    confidentialityNote:
+      "Concept visual — real internal software cannot be shown due to confidentiality obligations.",
+  },
+  {
+    slug: "ras-interim-zol",
+    title: "RAS × ZOL",
+    summary:
+      "Aligned R.A.S Intérim and ZOL teams delivering software for short-term missions, worker availability, assignments, and time tracking.",
+    role: "Agile Coach · Consultant",
+    year: "2022 2023",
+    tags: [],
+    cover: {
+      src: "/projects/ras-interim-zol-concept.jpg",
+      fullSrc: "/projects/ras-interim-zol-concept-full.png",
+      alt: "Concept dashboard for coordinating R.A.S Intérim missions and worker assignments",
+      width: 1672,
+      height: 941,
+    },
+    liveUrl: "https://www.ras-interim.fr/",
     concept: true,
     confidentialityNote:
       "Concept visual — real internal software cannot be shown due to confidentiality obligations.",

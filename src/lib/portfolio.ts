@@ -22,7 +22,11 @@ export function validateProjects(items: Project[]) {
     if (!project.cover.alt || project.cover.width <= 0 || project.cover.height <= 0) {
       throw new Error(`${project.title}: invalid cover`);
     }
-    if (!safeUrl(project.cover.src) || !safeUrl(project.liveUrl)) {
+    if (
+      !safeUrl(project.cover.src) ||
+      (project.cover.fullSrc && !safeUrl(project.cover.fullSrc)) ||
+      !safeUrl(project.liveUrl)
+    ) {
       throw new Error(`${project.title}: unsafe URL`);
     }
   }
