@@ -175,7 +175,6 @@ Worked as part of a three-person academic research team exploring real-time sign
 - Worked with wireless haptic gloves, hand calibration and tracking software, gesture capture, and sign-language recognition.
 - Researched technical literature, defined the practical problem, implemented experimental software, documented results, and delivered a coherent MSc dissertation.
 - Connected software engineering, research methodology, accessibility, human-computer interaction, and entrepreneurship.
-- Published a [video demonstration](https://www.youtube.com/watch?v=LHGellNWDiQ) of the prototype.
 
 ### Pepper-Corp - Project Lead Developer
 

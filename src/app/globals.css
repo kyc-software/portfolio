@@ -1788,6 +1788,12 @@ a[href]:active {
   justify-self: start;
 }
 
+.viewer-bar.is-concept {
+  right: auto;
+  width: auto;
+  grid-template-columns: auto;
+}
+
 .viewer-identity {
   display: flex;
   align-items: center;

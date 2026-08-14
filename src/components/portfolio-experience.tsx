@@ -12,7 +12,10 @@ import {
   X,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
-
+import { CarrefourConcept } from "@/components/concepts/carrefour/carrefour-concept";
+import { RasConcept } from "@/components/concepts/ras/ras-concept";
+import { ThalesConcept } from "@/components/concepts/thales/thales-concept";
+import { ThesisConcept } from "@/components/concepts/thesis/thesis-concept";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -32,14 +35,6 @@ import { type Project, projects, siteConfig } from "@/content/portfolio";
 import { getProjectSlug, validateProjects } from "@/lib/portfolio";
 
 const validProjects = validateProjects(projects);
-
-function preloadProjectCover(project: Project) {
-  if (!project.cover.fullSrc) return;
-  const image = new Image();
-  image.fetchPriority = "high";
-  image.src = project.cover.fullSrc;
-  void image.decode().catch(() => {});
-}
 
 function ProjectCard({
   project,
@@ -92,12 +87,11 @@ function ProjectCard({
       <button
         type="button"
         className="project-card-trigger"
-        onPointerEnter={() => preloadProjectCover(project)}
-        onPointerDown={() => preloadProjectCover(project)}
-        onFocus={() => preloadProjectCover(project)}
         onClick={(event) => {
           if (project.embeddable === false && !project.concept) {
-            window.open(project.liveUrl, "_blank", "noopener,noreferrer");
+            if (project.liveUrl) {
+              window.open(project.liveUrl, "_blank", "noopener,noreferrer");
+            }
             return;
           }
           onOpen(project, event.currentTarget);
@@ -149,7 +143,7 @@ function LiveProject({
           </DialogDescription>
 
           <div className="viewer-shell">
-            <header className="viewer-bar">
+            <header className={`viewer-bar${project.concept ? " is-concept" : ""}`}>
               <Button
                 type="button"
                 variant="secondary"
@@ -161,16 +155,12 @@ function LiveProject({
                 Back
               </Button>
 
-              <div className="viewer-identity">
-                <strong>{project.title}</strong>
-                <span>
-                  {project.concept
-                    ? "Concept visual"
-                    : loaded
-                      ? "Live website"
-                      : "Connecting"}
-                </span>
-              </div>
+              {project.concept ? null : (
+                <div className="viewer-identity">
+                  <strong>{project.title}</strong>
+                  <span>{loaded ? "Live website" : "Connecting"}</span>
+                </div>
+              )}
 
               {project.concept ? null : (
                 <div className="viewer-actions">
@@ -184,7 +174,9 @@ function LiveProject({
                     <RotateCw />
                   </Button>
                   <Button
-                    render={<a href={project.liveUrl} target="_blank" rel="noreferrer" />}
+                    render={
+                      <a href={project.liveUrl ?? "#"} target="_blank" rel="noreferrer" />
+                    }
                     variant="secondary"
                     size="sm"
                   >
@@ -199,19 +191,31 @@ function LiveProject({
               <div
                 className={`concept-project${project.slug === "thales" ? " is-dark" : ""}`}
               >
-                <img
-                  src={project.cover.src}
-                  alt=""
-                  aria-hidden="true"
-                  className="concept-project-preview"
-                />
-                <img
-                  src={project.cover.fullSrc ?? project.cover.src}
-                  alt={project.cover.alt}
-                  fetchPriority="high"
-                  className={`concept-project-full${loaded ? " is-loaded" : ""}`}
-                  onLoad={() => setLoaded(true)}
-                />
+                {project.slug === "carrefour" ? (
+                  <CarrefourConcept />
+                ) : project.slug === "ras-interim-zol" ? (
+                  <RasConcept />
+                ) : project.slug === "thales" ? (
+                  <ThalesConcept />
+                ) : project.slug === "university-of-kent" ? (
+                  <ThesisConcept />
+                ) : (
+                  <>
+                    <img
+                      src={project.cover.src}
+                      alt=""
+                      aria-hidden="true"
+                      className="concept-project-preview"
+                    />
+                    <img
+                      src={project.cover.src}
+                      alt={project.cover.alt}
+                      fetchPriority="high"
+                      className={`concept-project-full${loaded ? " is-loaded" : ""}`}
+                      onLoad={() => setLoaded(true)}
+                    />
+                  </>
+                )}
               </div>
             ) : (
               <div className="live-project">
@@ -238,7 +242,7 @@ function LiveProject({
 
                 <iframe
                   key={`${project.slug}-${reloadKey}`}
-                  src={project.liveUrl}
+                  src={project.liveUrl ?? "about:blank"}
                   title={`${project.title} live website`}
                   onLoad={() => setLoaded(true)}
                   referrerPolicy="strict-origin-when-cross-origin"

@@ -7,12 +7,11 @@ export type Project = {
   tags: string[];
   cover: {
     src: string;
-    fullSrc?: string;
     alt: string;
     width: number;
     height: number;
   };
-  liveUrl: string;
+  liveUrl?: string;
   embeddable?: boolean;
   concept?: boolean;
   confidentialityNote?: string;
@@ -105,7 +104,7 @@ export const projects: Project[] = [
       width: 1600,
       height: 900,
     },
-    liveUrl: "https://loany-simulateur.vercel.app",
+    liveUrl: "https://www.loany.fr/",
   },
   {
     slug: "bisonflow",
@@ -172,11 +171,10 @@ export const projects: Project[] = [
     year: "2024 2023",
     tags: [],
     cover: {
-      src: "/projects/carrefour-promotion-concept.jpg",
-      fullSrc: "/projects/carrefour-promotion-concept-full.png",
+      src: "/projects/carrefour-concept.webp",
       alt: "Concept dashboard for managing Carrefour product promotions across stores",
-      width: 1672,
-      height: 941,
+      width: 1248,
+      height: 720,
     },
     liveUrl: "https://www.carrefour.com/",
     concept: true,
@@ -192,11 +190,10 @@ export const projects: Project[] = [
     year: "2023 2022",
     tags: [],
     cover: {
-      src: "/projects/ras-interim-zol-concept.jpg",
-      fullSrc: "/projects/ras-interim-zol-concept-full.png",
+      src: "/projects/ras-interim-zol-concept.webp",
       alt: "Concept dashboard for coordinating R.A.S Intérim missions and worker assignments",
-      width: 1672,
-      height: 941,
+      width: 1248,
+      height: 720,
     },
     liveUrl: "https://www.ras-interim.fr/",
     concept: true,
@@ -229,11 +226,10 @@ export const projects: Project[] = [
     year: "2021 2019",
     tags: [],
     cover: {
-      src: "/projects/thales-airspace-concept.jpg",
-      fullSrc: "/projects/thales-airspace-concept-full.png",
+      src: "/projects/thales-concept.webp",
       alt: "Concept airspace defence interface with alerts, communications, aircraft tracks, and contextual details",
-      width: 1672,
-      height: 941,
+      width: 1248,
+      height: 720,
     },
     liveUrl: "https://www.thalesgroup.com/en",
     concept: true,
@@ -249,12 +245,11 @@ export const projects: Project[] = [
     year: 2018,
     tags: ["React", "Python", "Haptic Gloves", "Sign Language"],
     cover: {
-      src: "/projects/university-of-kent-haptic-gloves.webp",
-      alt: "Concept visual showing wireless haptic gloves beside calibration and sign-language recognition software",
-      width: 1600,
-      height: 900,
+      src: "/projects/thesis-concept.webp",
+      alt: "Interactive concept showing wireless haptic gloves beside calibration and sign-language recognition software",
+      width: 1248,
+      height: 720,
     },
-    liveUrl: "https://www.youtube.com/watch?v=LHGellNWDiQ",
-    embeddable: false,
+    concept: true,
   },
 ];

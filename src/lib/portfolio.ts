@@ -24,8 +24,7 @@ export function validateProjects(items: Project[]) {
     }
     if (
       !safeUrl(project.cover.src) ||
-      (project.cover.fullSrc && !safeUrl(project.cover.fullSrc)) ||
-      !safeUrl(project.liveUrl)
+      (!project.concept && (!project.liveUrl || !safeUrl(project.liveUrl)))
     ) {
       throw new Error(`${project.title}: unsafe URL`);
     }
