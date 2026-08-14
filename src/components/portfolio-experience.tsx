@@ -440,7 +440,6 @@ function PortfolioEasterEgg() {
         }}
       >
         <span className="easter-egg-visual" aria-hidden="true">
-          <span className="easter-egg-aura" />
           <span className="easter-egg-particles" />
           <img src="/assets/golden-egg.webp" alt="" width="640" height="640" />
         </span>
