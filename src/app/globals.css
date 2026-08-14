@@ -1431,7 +1431,7 @@ a[href]:active {
   z-index: 2;
   overflow: hidden;
   isolation: isolate;
-  padding: clamp(7rem, 11vw, 11rem) clamp(1rem, 2.5vw, 2.5rem);
+  padding: clamp(7rem, 11vw, 11rem) clamp(1rem, 2.5vw, 2.5rem) 7rem;
   background:
     radial-gradient(circle at 88% 8%, rgba(103, 232, 249, 0.06), transparent 28%),
     radial-gradient(circle at 8% 58%, rgba(167, 139, 250, 0.045), transparent 26%),
@@ -1445,6 +1445,7 @@ a[href]:active {
   background-image:
     linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
     linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
+  background-position: left bottom;
   background-size: 7rem 7rem;
   content: "";
   opacity: 0.27;
@@ -1508,6 +1509,194 @@ a[href]:active {
   align-items: stretch;
   max-width: 96rem;
   margin: 0 auto;
+}
+
+.easter-egg-trigger {
+  --egg-x: 0px;
+  --egg-y: 0px;
+  --egg-rx: 0deg;
+  --egg-ry: 0deg;
+  position: relative;
+  z-index: 4;
+  width: clamp(7rem, 9vw, 9rem);
+  aspect-ratio: 1;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.easter-egg-section {
+  position: relative;
+  z-index: 3;
+  display: grid;
+  height: 12rem;
+  place-items: center;
+  overflow: hidden;
+  border-top: 1px solid rgba(255, 255, 255, 0.012);
+  background: #050607;
+}
+
+.easter-egg-visual {
+  position: absolute;
+  inset: -25%;
+  display: grid;
+  place-items: center;
+  opacity: 0;
+  pointer-events: none;
+  transform: translate3d(var(--egg-x), var(--egg-y), 0) rotateX(var(--egg-rx))
+    rotateY(var(--egg-ry)) scale(0.86);
+  transform-style: preserve-3d;
+  transition:
+    opacity 260ms ease,
+    transform 340ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.easter-egg-trigger:hover .easter-egg-visual,
+.easter-egg-trigger:focus-visible .easter-egg-visual,
+.easter-egg-trigger:active .easter-egg-visual {
+  opacity: 1;
+  transform: translate3d(var(--egg-x), var(--egg-y), 0) rotateX(var(--egg-rx))
+    rotateY(var(--egg-ry)) scale(1);
+}
+
+.easter-egg-trigger:focus-visible {
+  outline: 1px dashed rgba(252, 211, 77, 0.65);
+  outline-offset: 0.3rem;
+  border-radius: 50%;
+}
+
+.easter-egg-visual > img {
+  position: relative;
+  z-index: 2;
+  width: 58%;
+  height: auto;
+  filter: drop-shadow(0 0 0.8rem rgba(251, 191, 36, 0.28));
+  transform: translateZ(1.2rem);
+}
+
+.easter-egg-aura,
+.easter-egg-particles {
+  position: absolute;
+  inset: 10%;
+  border-radius: 50%;
+}
+
+.easter-egg-aura {
+  background: radial-gradient(circle, rgba(251, 191, 36, 0.18), transparent 66%);
+  filter: blur(0.5rem);
+}
+
+.easter-egg-particles {
+  background-image:
+    radial-gradient(circle at 18% 28%, rgba(254, 240, 138, 0.9) 0 1px, transparent 2px),
+    radial-gradient(circle at 78% 22%, rgba(253, 224, 71, 0.7) 0 1px, transparent 2px),
+    radial-gradient(circle at 88% 62%, rgba(255, 255, 255, 0.7) 0 1px, transparent 2px),
+    radial-gradient(
+      circle at 22% 74%,
+      rgba(251, 191, 36, 0.72) 0 1.5px,
+      transparent 2.5px
+    ),
+    radial-gradient(circle at 56% 8%, rgba(255, 255, 255, 0.72) 0 1px, transparent 2px),
+    radial-gradient(circle at 48% 91%, rgba(254, 240, 138, 0.62) 0 1px, transparent 2px);
+  filter: drop-shadow(0 0 0.35rem rgba(251, 191, 36, 0.6));
+  animation: easter-egg-shimmer 2.8s ease-in-out infinite;
+}
+
+@keyframes easter-egg-shimmer {
+  50% {
+    opacity: 0.52;
+    transform: rotate(2deg) scale(0.97);
+  }
+}
+
+.world-dialog-overlay {
+  z-index: 79 !important;
+  background: rgba(2, 3, 4, 0.86) !important;
+  backdrop-filter: blur(14px);
+}
+
+.world-dialog {
+  z-index: 80 !important;
+  width: min(calc(100vw - 1.5rem), 56rem) !important;
+  max-width: 56rem !important;
+  max-height: 94svh;
+  gap: 0.8rem !important;
+  padding: 0.8rem !important;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 1.25rem !important;
+  background: #07090a !important;
+  color: var(--paper) !important;
+  box-shadow: 0 2rem 7rem rgba(0, 0, 0, 0.72) !important;
+}
+
+.world-dialog > header {
+  display: flex;
+  min-height: 2.5rem;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0 0.3rem 0 0.55rem;
+}
+
+.world-dialog [data-slot="dialog-title"] {
+  font-family: var(--font-lexend), sans-serif;
+  font-size: clamp(1rem, 2vw, 1.35rem);
+  font-weight: 540;
+  letter-spacing: -0.035em;
+}
+
+.world-dialog-close {
+  display: grid;
+  width: 2.25rem;
+  aspect-ratio: 1;
+  place-items: center;
+  flex: none;
+  cursor: pointer;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--paper);
+}
+
+.world-dialog-close:hover {
+  border-color: var(--cyan);
+  color: var(--cyan);
+}
+
+.world-dialog-close svg {
+  width: 1rem;
+}
+
+.world-dialog > img {
+  display: block;
+  width: auto;
+  max-width: 100%;
+  max-height: calc(94svh - 4.9rem);
+  justify-self: center;
+  border-radius: 0.8rem;
+  object-fit: contain;
+}
+
+@media (max-width: 700px) {
+  .easter-egg-section {
+    height: 8rem;
+  }
+
+  .easter-egg-trigger {
+    width: 5.5rem;
+  }
+
+  .easter-egg-visual {
+    inset: -18%;
+  }
+
+  .world-dialog {
+    width: calc(100vw - 0.75rem) !important;
+    padding: 0.45rem !important;
+  }
 }
 
 .project-card {
@@ -2463,7 +2652,7 @@ a[href]:active {
 .manifesto {
   position: relative;
   display: flex;
-  min-height: 68svh;
+  min-height: calc(68svh - 6rem);
   flex-direction: column;
   align-items: center;
   justify-content: center;
@@ -2888,7 +3077,11 @@ a[href]:active {
   }
 
   .work-section {
-    padding: 6rem 1rem;
+    padding: 6rem 1rem 4rem;
+  }
+
+  .work-section::before {
+    background-size: 4rem 4rem;
   }
 
   .section-heading {
@@ -2897,7 +3090,7 @@ a[href]:active {
   }
 
   .manifesto {
-    min-height: 60svh;
+    min-height: calc(60svh - 8rem);
     padding: 5rem 1.25rem;
   }
 

@@ -414,6 +414,61 @@ function ContactSheet({
   );
 }
 
+function PortfolioEasterEgg() {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <button
+        type="button"
+        className="easter-egg-trigger"
+        aria-label="Open My world in a room"
+        onClick={() => setOpen(true)}
+        onPointerMove={(event) => {
+          const bounds = event.currentTarget.getBoundingClientRect();
+          const x = (event.clientX - bounds.left) / bounds.width - 0.5;
+          const y = (event.clientY - bounds.top) / bounds.height - 0.5;
+          event.currentTarget.style.setProperty("--egg-x", `${x * 9}px`);
+          event.currentTarget.style.setProperty("--egg-y", `${y * 7}px`);
+          event.currentTarget.style.setProperty("--egg-rx", `${y * -4}deg`);
+          event.currentTarget.style.setProperty("--egg-ry", `${x * 5}deg`);
+        }}
+        onPointerLeave={(event) => {
+          for (const property of ["--egg-x", "--egg-y", "--egg-rx", "--egg-ry"]) {
+            event.currentTarget.style.removeProperty(property);
+          }
+        }}
+      >
+        <span className="easter-egg-visual" aria-hidden="true">
+          <span className="easter-egg-aura" />
+          <span className="easter-egg-particles" />
+          <img src="/assets/golden-egg.webp" alt="" width="640" height="640" />
+        </span>
+      </button>
+
+      <DialogContent className="world-dialog" overlayClassName="world-dialog-overlay">
+        <header>
+          <DialogTitle>My world in a room</DialogTitle>
+          <button
+            type="button"
+            className="world-dialog-close"
+            onClick={() => setOpen(false)}
+            aria-label="Close My world in a room"
+          >
+            <X aria-hidden="true" />
+          </button>
+        </header>
+        <img
+          src="/assets/my-world-in-a-room.webp"
+          alt="My world in a room"
+          width="1448"
+          height="1086"
+        />
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export function PortfolioExperience() {
   const router = useRouter({ warn: false });
   const [menuOpen, setMenuOpen] = useState(false);
@@ -637,6 +692,10 @@ export function PortfolioExperience() {
                 <ProjectCard key={project.slug} project={project} onOpen={openProject} />
               ))}
             </div>
+          </section>
+
+          <section className="easter-egg-section" aria-label="Hidden easter egg">
+            <PortfolioEasterEgg />
           </section>
 
           <section className="manifesto">
