@@ -266,6 +266,8 @@ function ContactSheet({
   onOpenChange: (open: boolean) => void;
 }) {
   const [copied, setCopied] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
+  const linkedin = siteConfig.socialLinks.find((link) => link.label === "LinkedIn");
 
   const copyEmail = async () => {
     await navigator.clipboard.writeText(siteConfig.email);
@@ -337,6 +339,75 @@ function ContactSheet({
               {link.label}
             </a>
           ))}
+
+          <Dialog open={shareOpen} onOpenChange={setShareOpen}>
+            <button
+              type="button"
+              className="contact-qr-trigger"
+              onClick={() => setShareOpen(true)}
+              aria-label="Share Anthony Abramo’s portfolio"
+            >
+              <img src="/assets/portfolio-qr.webp" alt="" aria-hidden="true" />
+              <span>
+                <strong>Share</strong>
+                <small>Portfolio</small>
+              </span>
+            </button>
+
+            <DialogContent
+              className="share-profile-dialog"
+              overlayClassName="share-profile-overlay"
+            >
+              <button
+                type="button"
+                className="share-dialog-close"
+                onClick={() => setShareOpen(false)}
+                aria-label="Close share dialog"
+              >
+                <X aria-hidden="true" />
+              </button>
+
+              <header className="share-profile-header">
+                <img
+                  src="/assets/anthony-social-avatar.webp"
+                  alt="Anthony Abramo"
+                  width="512"
+                  height="512"
+                />
+                <div>
+                  <span className="eyebrow">Share my portfolio</span>
+                  <DialogTitle>Anthony Abramo</DialogTitle>
+                  <DialogDescription>
+                    Senior product engineer · Taipei / Remote
+                  </DialogDescription>
+                </div>
+              </header>
+
+              <div className="share-profile-card">
+                <div className="share-qr-frame">
+                  <img
+                    src="/assets/portfolio-qr.webp"
+                    alt="QR code for anthonyabramo.com"
+                    width="500"
+                    height="500"
+                  />
+                </div>
+                <div className="share-profile-copy">
+                  <p>Scan to open portfolio</p>
+                  <a href={siteConfig.portfolioUrl} target="_blank" rel="noreferrer">
+                    anthonyabramo.com
+                    <ExternalLink aria-hidden="true" />
+                  </a>
+                  {linkedin ? (
+                    <a href={linkedin.href} target="_blank" rel="noreferrer">
+                      LinkedIn · Anthony Abramo
+                      <ArrowUpRight aria-hidden="true" />
+                    </a>
+                  ) : null}
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
         </footer>
       </SheetContent>
     </Sheet>

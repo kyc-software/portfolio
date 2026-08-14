@@ -27,6 +27,7 @@ export type SiteConfig = {
   role: string;
   introduction: string;
   email: string;
+  portfolioUrl: string;
   socialLinks: SocialLink[];
 };
 
@@ -36,6 +37,7 @@ export const siteConfig: SiteConfig = {
   introduction:
     "I work with you from defining the need through sketches, development, and launch.",
   email: "anthony.abramo.pro@gmail.com",
+  portfolioUrl: "https://anthonyabramo.com/",
   socialLinks: [
     { label: "GitHub", href: "https://github.com/kyc-software/" },
     { label: "LinkedIn", href: "https://www.linkedin.com/in/anthony-abramo/" },
