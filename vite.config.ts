@@ -14,7 +14,7 @@ function securityHeaders(development: boolean) {
     "img-src 'self' data: blob:",
     "font-src 'self' data:",
     `connect-src 'self'${development ? " ws: wss:" : ""}`,
-    "frame-src 'self' https://bragi-notes.vercel.app https://tingshuo.vercel.app https://loany-simulateur.vercel.app https://bisonflow.com",
+    "frame-src 'self' https://bragi-notes.vercel.app https://tingshuo.vercel.app https://www.loany.fr https://bisonflow.com",
     "media-src 'self' blob: https://*.convex.cloud",
     "object-src 'none'",
     "base-uri 'self'",
