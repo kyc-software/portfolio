@@ -44,6 +44,16 @@ function ProjectCard({
   project: Project;
   onOpen: (project: Project, trigger: HTMLButtonElement) => void;
 }) {
+  const previewLabel = project.before
+    ? "Compare sites"
+    : project.concept
+      ? "Open concept"
+      : "Open live";
+  const previewType = project.before
+    ? "before and after"
+    : project.concept
+      ? "concept visual"
+      : "website";
   const content = (
     <>
       <div className="project-media">
@@ -55,7 +65,7 @@ function ProjectCard({
           className="fill-image"
         />
         <span className="project-open">
-          {project.concept ? "Open concept" : "Open live"}
+          {previewLabel}
           <ArrowUpRight aria-hidden="true" />
         </span>
       </div>
@@ -97,7 +107,7 @@ function ProjectCard({
           }
           onOpen(project, event.currentTarget);
         }}
-        aria-label={`Open ${project.title} ${project.concept ? "concept visual" : "website"}`}
+        aria-label={`Open ${project.title} ${previewType}`}
       >
         {content}
       </button>
@@ -112,150 +122,177 @@ function LiveProject({
   project: Project | null;
   onClose: () => void;
 }) {
-  const [loaded, setLoaded] = useState(false);
-  const [timedOut, setTimedOut] = useState(false);
-  const [reloadKey, setReloadKey] = useState(0);
-
-  useEffect(() => {
-    setLoaded(false);
-    setTimedOut(false);
-    setReloadKey(0);
-    if (!project) return;
-
-    const timer = window.setTimeout(() => setTimedOut(true), 10_000);
-    return () => window.clearTimeout(timer);
-  }, [project]);
-
-  const reload = () => {
-    setLoaded(false);
-    setTimedOut(false);
-    setReloadKey((value) => value + 1);
-  };
-
   return (
     <Dialog open={Boolean(project)} onOpenChange={(open) => !open && onClose()}>
-      {project ? (
-        <DialogContent className="top-0 left-0 translate-x-0 translate-y-0 project-viewer">
-          <DialogTitle className="sr-only">{project.title}</DialogTitle>
-          <DialogDescription className="sr-only">
-            {project.concept
-              ? `Concept visual for ${project.title}`
-              : `Live embedded preview of ${project.title}`}
-          </DialogDescription>
+      {project && (
+        <ProjectPreview key={project.slug} project={project} onClose={onClose} />
+      )}
+    </Dialog>
+  );
+}
 
-          <div className="viewer-shell">
-            <header className={`viewer-bar${project.concept ? " is-concept" : ""}`}>
+function ProjectPreview({ project, onClose }: { project: Project; onClose: () => void }) {
+  const [showBefore, setShowBefore] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
+  const before = showBefore ? project.before : undefined;
+  const siteUrl = before?.siteUrl ?? project.liveUrl;
+  const canEmbed =
+    !project.embedOrigins || project.embedOrigins.includes(window.location.origin);
+
+  return (
+    <DialogContent className="project-viewer">
+      <DialogDescription className="sr-only">
+        {project.before
+          ? "Compare the original landing page and the B2B redesign prototype."
+          : project.concept
+            ? `Concept visual for ${project.title}`
+            : `Live embedded preview of ${project.title}`}
+      </DialogDescription>
+
+      <header className="viewer-bar">
+        <div className="viewer-heading">
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            className="viewer-back"
+            onClick={onClose}
+            aria-label={`Close ${project.title}`}
+          >
+            <ArrowLeft data-icon="inline-start" />
+            <span>Back</span>
+          </Button>
+          <div className="viewer-identity">
+            <DialogTitle>{project.title}</DialogTitle>
+            <span>
+              {project.concept
+                ? "Concept preview"
+                : before
+                  ? "Original snapshot"
+                  : canEmbed
+                    ? "Live preview"
+                    : "Preview image"}
+            </span>
+          </div>
+        </div>
+
+        {project.before && (
+          <fieldset className="viewer-compare">
+            <legend className="sr-only">Compare websites</legend>
+            <button
+              type="button"
+              aria-pressed={showBefore}
+              onClick={() => setShowBefore(true)}
+            >
+              Before
+            </button>
+            <button
+              type="button"
+              aria-pressed={!showBefore}
+              onClick={() => setShowBefore(false)}
+            >
+              After
+            </button>
+          </fieldset>
+        )}
+
+        {!project.concept && siteUrl && (
+          <div className="viewer-actions">
+            {!before && canEmbed && (
               <Button
                 type="button"
                 variant="secondary"
-                size="sm"
-                onClick={onClose}
-                aria-label={`Close ${project.title}`}
+                size="icon-sm"
+                onClick={() => setReloadKey((value) => value + 1)}
+                aria-label="Reload preview"
               >
-                <ArrowLeft data-icon="inline-start" />
-                Back
+                <RotateCw />
               </Button>
-
-              {project.concept ? null : (
-                <div className="viewer-identity">
-                  <strong>{project.title}</strong>
-                  <span>{loaded ? "Live website" : "Connecting"}</span>
-                </div>
-              )}
-
-              {project.concept ? null : (
-                <div className="viewer-actions">
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    size="icon-sm"
-                    onClick={reload}
-                    aria-label={`Reload ${project.title}`}
-                  >
-                    <RotateCw />
-                  </Button>
-                  <Button
-                    render={
-                      <a href={project.liveUrl ?? "#"} target="_blank" rel="noreferrer" />
-                    }
-                    variant="secondary"
-                    size="sm"
-                  >
-                    Open site
-                    <ExternalLink data-icon="inline-end" />
-                  </Button>
-                </div>
-              )}
-            </header>
-
-            {project.concept ? (
-              <div
-                className={`concept-project${project.slug === "thales" ? " is-dark" : ""}`}
-              >
-                {project.slug === "carrefour" ? (
-                  <CarrefourConcept />
-                ) : project.slug === "ras-interim-zol" ? (
-                  <RasConcept />
-                ) : project.slug === "thales" ? (
-                  <ThalesConcept />
-                ) : project.slug === "university-of-kent" ? (
-                  <ThesisConcept />
-                ) : (
-                  <>
-                    <img
-                      src={project.cover.src}
-                      alt=""
-                      aria-hidden="true"
-                      className="concept-project-preview"
-                    />
-                    <img
-                      src={project.cover.src}
-                      alt={project.cover.alt}
-                      fetchPriority="high"
-                      className={`concept-project-full${loaded ? " is-loaded" : ""}`}
-                      onLoad={() => setLoaded(true)}
-                    />
-                  </>
-                )}
-              </div>
-            ) : (
-              <div className="live-project">
-                <div className={`live-project-poster${loaded ? " is-hidden" : ""}`}>
-                  <img
-                    src={project.cover.src}
-                    alt=""
-                    loading="eager"
-                    decoding="async"
-                    className="fill-image"
-                  />
-                  <div className="live-project-loading" role="status">
-                    <span />
-                    <strong>
-                      {timedOut ? "Preview unavailable" : `Opening ${project.title}`}
-                    </strong>
-                    <p>
-                      {timedOut
-                        ? "This site may block embedding. Use Open site."
-                        : "Loading live website"}
-                    </p>
-                  </div>
-                </div>
-
-                <iframe
-                  key={`${project.slug}-${reloadKey}`}
-                  src={project.liveUrl ?? "about:blank"}
-                  title={`${project.title} live website`}
-                  onLoad={() => setLoaded(true)}
-                  referrerPolicy="strict-origin-when-cross-origin"
-                  sandbox="allow-downloads allow-forms allow-modals allow-popups allow-popups-to-escape-sandbox allow-same-origin allow-scripts"
-                  allow="clipboard-read; clipboard-write; fullscreen"
-                />
-              </div>
             )}
+            <Button
+              render={<a href={siteUrl} target="_blank" rel="noreferrer" />}
+              variant="secondary"
+              size="sm"
+              aria-label={
+                before ? "Open original site in a new tab" : "Open site in a new tab"
+              }
+            >
+              <span>{before ? "Open original" : "Open site"}</span>
+              <ExternalLink data-icon="inline-end" />
+            </Button>
           </div>
-        </DialogContent>
-      ) : null}
-    </Dialog>
+        )}
+      </header>
+
+      {project.concept ? (
+        <div className={`concept-project${project.slug === "thales" ? " is-dark" : ""}`}>
+          {project.slug === "carrefour" ? (
+            <CarrefourConcept />
+          ) : project.slug === "ras-interim-zol" ? (
+            <RasConcept />
+          ) : project.slug === "thales" ? (
+            <ThalesConcept />
+          ) : project.slug === "university-of-kent" ? (
+            <ThesisConcept />
+          ) : (
+            <img src={project.cover.src} alt={project.cover.alt} />
+          )}
+        </div>
+      ) : before ? (
+        <section
+          className="snapshot-project"
+          // biome-ignore lint/a11y/noNoninteractiveTabindex: Keyboard users need to scroll this region.
+          tabIndex={0}
+          aria-label="Scroll the original homepage"
+        >
+          <picture>
+            <source media="(max-width: 700px)" srcSet={before.mobileImage} />
+            <img src={before.image} alt={before.alt} />
+          </picture>
+        </section>
+      ) : !canEmbed ? (
+        <div className="concept-project">
+          <img src={project.cover.src} alt={project.cover.alt} />
+        </div>
+      ) : (
+        project.liveUrl && (
+          <EmbeddedPreview key={reloadKey} src={project.liveUrl} project={project} />
+        )
+      )}
+    </DialogContent>
+  );
+}
+
+function EmbeddedPreview({ src, project }: { src: string; project: Project }) {
+  const [loaded, setLoaded] = useState(false);
+  const [timedOut, setTimedOut] = useState(false);
+
+  useEffect(() => {
+    if (loaded) return;
+    const timer = window.setTimeout(() => setTimedOut(true), 10_000);
+    return () => window.clearTimeout(timer);
+  }, [loaded]);
+
+  return (
+    <div className="live-project">
+      <div className={`live-project-poster${loaded ? " is-hidden" : ""}`}>
+        <img src={project.cover.src} alt="" decoding="async" className="fill-image" />
+        <div className="live-project-loading" role="status">
+          {!timedOut && <span />}
+          <strong>{timedOut ? "Preview unavailable" : `Opening ${project.title}`}</strong>
+          {timedOut && <p>Use the site link to open it in a new tab.</p>}
+        </div>
+      </div>
+
+      <iframe
+        src={src}
+        title={`${project.title} live preview`}
+        onLoad={() => setLoaded(true)}
+        referrerPolicy="strict-origin-when-cross-origin"
+        sandbox="allow-downloads allow-forms allow-modals allow-popups allow-popups-to-escape-sandbox allow-same-origin allow-scripts"
+        allow="clipboard-read; clipboard-write; fullscreen"
+      />
+    </div>
   );
 }
 

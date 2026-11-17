@@ -12,6 +12,13 @@ export type Project = {
     height: number;
   };
   liveUrl?: string;
+  embedOrigins?: readonly string[];
+  before?: {
+    image: `/${string}`;
+    mobileImage: `/${string}`;
+    alt: string;
+    siteUrl: `https://${string}`;
+  };
   embeddable?: boolean;
   concept?: boolean;
   confidentialityNote?: string;
@@ -45,6 +52,64 @@ export const siteConfig: SiteConfig = {
 };
 
 export const projects: Project[] = [
+  {
+    slug: "profil-plus",
+    title: "Profil Plus",
+    summary:
+      "Designed and built a B2B redesign prototype for Profil Plus. It covers tire selection, quotes, bookings, and fleet management, with a UX walkthrough and a client workshop.",
+    role: "Client project · UX/UI design · Full-stack engineering",
+    year: 2026,
+    tags: [
+      "React",
+      "TypeScript",
+      "TanStack Start",
+      "Tailwind CSS",
+      "Base UI",
+      "Convex",
+      "React Flow",
+    ],
+    cover: {
+      src: "/projects/profil-plus.webp",
+      alt: "Profil Plus B2B redesign with vehicles for transport, agriculture, and construction",
+      width: 1600,
+      height: 900,
+    },
+    liveUrl: "https://profil-plus-concept.vercel.app/",
+    embedOrigins: ["https://anthonyabramo.com", "https://www.anthonyabramo.com"],
+    before: {
+      image: "/projects/profil-plus-before-desktop.webp",
+      mobileImage: "/projects/profil-plus-before-mobile.webp",
+      alt: "Original Profil Plus homepage, with tire promotions, tire and service search, featured products, loyalty offers, and driving advice.",
+      siteUrl: "https://www.profilplus.fr/",
+    },
+  },
+  {
+    slug: "bisonflow",
+    title: "Bisonflow",
+    summary:
+      "Project management for teams and AI agents, with shared tasks, roadmaps, timelines, docs, and budgets. Teams can work from the app or connect their AI tools through MCP.",
+    role: "Founder · Product design · Full-stack engineering",
+    year: 2026,
+    tags: [
+      "React",
+      "TypeScript",
+      "TanStack Start",
+      "Tailwind CSS",
+      "Convex",
+      "Clerk",
+      "Stripe",
+      "Tiptap",
+      "OpenAI",
+      "MCP",
+    ],
+    cover: {
+      src: "/projects/bisonflow-2026-11.webp",
+      alt: "Bisonflow homepage with a preview of the workspace dashboard",
+      width: 1600,
+      height: 900,
+    },
+    liveUrl: "https://bisonflow.com/",
+  },
   {
     slug: "bragi-notes",
     title: "Bragi Notes",
@@ -107,33 +172,7 @@ export const projects: Project[] = [
       height: 900,
     },
     liveUrl: "https://www.loany.fr/",
-  },
-  {
-    slug: "bisonflow",
-    title: "Bisonflow",
-    summary: "Voice-first project operations built to keep teams moving.",
-    role: "Founder · Product design · Full-stack engineering",
-    year: 2026,
-    tags: [
-      "React",
-      "TypeScript",
-      "Next.js",
-      "Tailwind",
-      "Convex",
-      "TipTap",
-      "AI",
-      "OpenAI",
-      "Prisma",
-      "Realtime",
-      "Zod",
-    ],
-    cover: {
-      src: "/projects/bisonflow.webp",
-      alt: "Bisonflow voice-first project operations website",
-      width: 1600,
-      height: 900,
-    },
-    liveUrl: "https://bisonflow.com/en",
+    embedOrigins: ["https://anthonyabramo.com"],
   },
   {
     slug: "pixlr",
