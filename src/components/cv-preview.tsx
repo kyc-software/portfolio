@@ -11,6 +11,8 @@ import {
 import "./cv-preview.css";
 
 const pdf = "/Anthony_Abramo_TW_CV.pdf";
+const pageSizes =
+  "(max-width: 720px) calc(100vw - 2rem), min(53rem, calc(100vw - 5.5rem))";
 
 export function CvPreview() {
   return (
@@ -18,7 +20,7 @@ export function CvPreview() {
       <DialogTrigger type="button" className="cv-trigger" aria-label="Preview CV">
         CV
       </DialogTrigger>
-      <DialogContent className="cv-viewer">
+      <DialogContent className="cv-viewer" overlayClassName="cv-overlay">
         <DialogDescription className="sr-only">
           Preview both pages or open the original, searchable PDF in a new tab.
         </DialogDescription>
@@ -55,6 +57,8 @@ export function CvPreview() {
         >
           <img
             src="/cv/page-1.webp"
+            srcSet="/cv/page-1.webp 1034w, /cv/page-1-2x.webp 1720w"
+            sizes={pageSizes}
             alt="CV page 1 of 2. Summary and experience at KYC Software, Pixlr, and Carrefour."
             width="1034"
             height="1462"
@@ -62,6 +66,8 @@ export function CvPreview() {
           />
           <img
             src="/cv/page-2.webp"
+            srcSet="/cv/page-2.webp 1034w, /cv/page-2-2x.webp 1720w"
+            sizes={pageSizes}
             alt="CV page 2 of 2. Earlier experience, technical skills, education, and languages."
             width="1034"
             height="1462"

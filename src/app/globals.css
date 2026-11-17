@@ -1909,116 +1909,112 @@ a[href]:active {
 
 .project-viewer {
   inset: 0 !important;
-  display: block !important;
-  width: 100vw !important;
+  display: grid !important;
+  width: min(86rem, calc(100% - 4rem)) !important;
   max-width: none !important;
-  height: 100svh !important;
-  padding: 0.75rem !important;
-  overflow: hidden;
-  border: 0 !important;
-  border-radius: 0 !important;
-  background: #000 !important;
-  color: white !important;
-  box-shadow: none !important;
-  transform: none !important;
-}
-
-.project-viewer[data-open] {
-  animation: viewer-in 340ms cubic-bezier(0.16, 1, 0.3, 1) both !important;
-}
-
-.project-viewer[data-closed] {
-  animation: viewer-out 220ms ease both !important;
-}
-
-@keyframes viewer-in {
-  from {
-    opacity: 0;
-    transform: scale(0.985);
-  }
-}
-
-@keyframes viewer-out {
-  to {
-    opacity: 0;
-    transform: scale(0.99);
-  }
-}
-
-.viewer-shell {
-  position: relative;
-  width: 100%;
-  height: 100%;
+  height: min(56rem, calc(100dvh - 5rem)) !important;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 0.7rem !important;
+  margin: auto;
+  padding: 0.7rem !important;
   overflow: hidden;
   border: 1px solid rgba(255, 255, 255, 0.16);
-  border-radius: 1.3rem;
-  background: #0a0b0c;
+  border-radius: 1.3rem !important;
+  background: #101315 !important;
+  color: var(--paper) !important;
+  translate: none !important;
 }
 
 .viewer-bar {
-  position: absolute;
-  z-index: 5;
-  top: 0.75rem;
-  right: 0.75rem;
-  left: 0.75rem;
   display: grid;
-  grid-template-columns: 1fr auto 1fr;
-  gap: 1rem;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  gap: 0.55rem;
   align-items: center;
-  pointer-events: none;
+  padding: 0.15rem;
 }
 
-.viewer-bar > * {
-  pointer-events: auto;
-}
-
-.viewer-bar > button:first-child {
-  justify-self: start;
-}
-
-.viewer-bar.is-concept {
-  right: auto;
-  width: auto;
-  grid-template-columns: auto;
-}
-
-.viewer-identity {
+.viewer-heading {
   display: flex;
   align-items: center;
-  gap: 0.6rem;
-  padding: 0.48rem 0.72rem;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 999px;
-  background: rgba(5, 6, 7, 0.86);
-  font-size: 0.56rem;
-  backdrop-filter: blur(14px);
+  gap: 0.75rem;
+}
+
+.viewer-identity h2 {
+  margin: 0;
+  font-size: 0.92rem;
 }
 
 .viewer-identity span {
-  color: rgba(255, 255, 255, 0.65);
+  color: rgba(255, 255, 255, 0.67);
+  font-size: 0.75rem;
 }
 
 .viewer-actions {
   display: flex;
+  grid-column: 3;
   justify-self: end;
   gap: 0.4rem;
 }
 
-.live-project {
-  position: absolute;
-  inset: 0;
+.viewer-compare {
+  display: flex;
+  grid-column: 2;
+  justify-self: center;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.viewer-compare button {
+  min-width: 5.5rem;
+  min-height: 2.5rem;
+  padding: 0.35rem 0.85rem;
+  cursor: pointer;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.62);
+  font-weight: 650;
+}
+
+.viewer-compare button:hover {
+  color: var(--paper);
+}
+
+.viewer-compare button[aria-pressed="true"] {
+  border-bottom-color: var(--cyan);
+  color: var(--paper);
+}
+
+.live-project,
+.concept-project,
+.snapshot-project {
+  position: relative;
+  min-height: 0;
   overflow: hidden;
-  border-radius: inherit;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 0.85rem;
+}
+
+.live-project {
   background: #0b0d0f;
 }
 
+.snapshot-project {
+  overflow: auto;
+  overscroll-behavior: contain;
+  background: white;
+}
+
+.snapshot-project img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
 .concept-project {
-  position: absolute;
-  inset: 0;
   display: grid;
   place-items: center;
-  overflow: hidden;
-  border-radius: inherit;
   background: #f4f7fb;
 }
 
@@ -2026,24 +2022,14 @@ a[href]:active {
   background: #101014;
 }
 
-.concept-project img {
-  position: absolute;
-  inset: 0;
+.concept-project > img {
   width: 100%;
   height: 100%;
   object-fit: contain;
 }
 
-.concept-project-full {
-  z-index: 1;
-  opacity: 0;
-}
-
-.concept-project-full.is-loaded {
-  opacity: 1;
-}
-
 .live-project iframe {
+  display: block;
   width: 100%;
   height: 100%;
   border: 0;
@@ -3026,33 +3012,25 @@ a[href]:active {
   }
 
   .project-viewer {
+    width: calc(100% - 1rem) !important;
+    height: calc(100dvh - 2rem) !important;
     padding: 0.4rem !important;
   }
 
-  .viewer-shell {
-    border-radius: 1rem;
+  .viewer-compare {
+    grid-column: 1 / -1;
+    grid-row: 2;
   }
 
-  .viewer-bar {
-    top: 0.55rem;
-    right: 0.55rem;
-    left: 0.55rem;
-    grid-template-columns: 1fr auto;
-  }
-
-  .viewer-identity {
-    display: none;
-  }
-
+  .viewer-back,
   .viewer-actions > a {
     width: 2rem;
     padding: 0;
-    overflow: hidden;
-    font-size: 0;
   }
 
-  .viewer-actions > a svg {
-    width: 0.9rem;
+  .viewer-back > span,
+  .viewer-actions > a > span {
+    display: none;
   }
 
   .navigation-dialog {

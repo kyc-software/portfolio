@@ -1,7 +1,7 @@
 import type { Project } from "@/content/portfolio";
 
 const safeUrl = (value: string) => {
-  if (value.startsWith("/")) return true;
+  if (value.startsWith("/")) return !/^\/[\\/]/.test(value) && !value.includes("\\");
   try {
     return new URL(value).protocol === "https:";
   } catch {
@@ -24,7 +24,15 @@ export function validateProjects(items: Project[]) {
     }
     if (
       !safeUrl(project.cover.src) ||
-      (!project.concept && (!project.liveUrl || !safeUrl(project.liveUrl)))
+      (!project.concept && (!project.liveUrl || !safeUrl(project.liveUrl))) ||
+      (project.before &&
+        (project.concept ||
+          project.embeddable === false ||
+          !project.before.alt ||
+          !safeUrl(project.before.image) ||
+          !safeUrl(project.before.mobileImage) ||
+          !project.before.siteUrl.startsWith("https://") ||
+          !safeUrl(project.before.siteUrl)))
     ) {
       throw new Error(`${project.title}: unsafe URL`);
     }
