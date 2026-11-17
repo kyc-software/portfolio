@@ -16,6 +16,7 @@ import { CarrefourConcept } from "@/components/concepts/carrefour/carrefour-conc
 import { RasConcept } from "@/components/concepts/ras/ras-concept";
 import { ThalesConcept } from "@/components/concepts/thales/thales-concept";
 import { ThesisConcept } from "@/components/concepts/thesis/thesis-concept";
+import { CvPreview } from "@/components/cv-preview";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -593,6 +594,7 @@ export function PortfolioExperience() {
             <span className="ml-2">Available for opportunities</span>
           </a>
           <div className="header-actions">
+            <CvPreview />
             <button
               type="button"
               className="contact-trigger"
